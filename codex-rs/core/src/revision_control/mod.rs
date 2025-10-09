@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+pub mod darcs;
 pub mod git;
 
 /// Enumeration of revision control backends supported by Codex.
@@ -23,13 +24,13 @@ impl DetectedRevisionControl {
 }
 
 /// Attempt to detect the revision control backend rooted at `base_dir`.
-///
-/// The current implementation only recognises Git repositories. Future
-/// updates will extend this to Darcs while keeping the detection flow in one
-/// place so the rest of the codebase can rely on a single entry point.
 pub fn detect_revision_control(base_dir: &Path) -> Option<DetectedRevisionControl> {
-    git::get_git_repo_root(base_dir)
-        .map(|root| DetectedRevisionControl::new(RevisionControlKind::Git, root))
+    if let Some(root) = git::get_git_repo_root(base_dir) {
+        return Some(DetectedRevisionControl::new(RevisionControlKind::Git, root));
+    }
+
+    darcs::get_darcs_repo_root(base_dir)
+        .map(|root| DetectedRevisionControl::new(RevisionControlKind::Darcs, root))
 }
 
 pub use git::get_git_repo_root;
@@ -59,5 +60,19 @@ mod tests {
         let dir = tempdir().unwrap();
 
         assert!(detect_revision_control(dir.path()).is_none());
+    }
+
+    #[test]
+    fn detects_darcs_repository() {
+        let dir = tempdir().unwrap();
+        let darcs_dir = dir.path().join("_darcs");
+        fs::create_dir(&darcs_dir).unwrap();
+
+        let detected = detect_revision_control(dir.path());
+
+        assert!(detected.is_some());
+        let detected = detected.unwrap();
+        assert_eq!(detected.kind, RevisionControlKind::Darcs);
+        assert_eq!(detected.root, dir.path());
     }
 }

@@ -11,8 +11,8 @@ implementation so the behavior can be replicated elsewhere.
   directory or file, allowing the application to decide whether Git features should be enabled without shelling out to
   `git` itself.【F:codex-rs/core/src/revision_control/git.rs†L1-L34】
 * `codex_core::revision_control::detect_revision_control` provides a single entry point for identifying the
-  repository backend. Today it returns Git repositories via the new abstraction, and future work will extend it to
-  recognise Darcs checkouts without forcing every caller to reimplement the detection logic.【F:codex-rs/core/src/revision_control/mod.rs†L1-L43】
+  repository backend and now recognises both Git and Darcs checkouts without forcing every caller to reimplement the
+  detection logic.【F:codex-rs/core/src/revision_control/mod.rs†L1-L57】
 * When Codex is pointed at a non-Git directory, higher-level features such as ghost snapshots are disabled and the UI emits an
   informational message explaining why, preventing repeated failures.【F:codex-rs/tui/src/chatwidget.rs†L1288-L1322】
 
