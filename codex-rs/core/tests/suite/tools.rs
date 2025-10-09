@@ -19,6 +19,7 @@ use core_test_support::responses::mount_sse_once;
 use core_test_support::responses::mount_sse_sequence;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
+use core_test_support::skip_if_landlock_unavailable;
 use core_test_support::skip_if_no_network;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::test_codex;
@@ -406,6 +407,7 @@ async fn shell_timeout_includes_timeout_prefix_and_metadata() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn shell_sandbox_denied_truncates_error_output() -> Result<()> {
     skip_if_no_network!(Ok(()));
+    skip_if_landlock_unavailable!(Ok(()));
 
     let server = start_mock_server().await;
     let mut builder = test_codex();

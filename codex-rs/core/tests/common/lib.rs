@@ -10,6 +10,14 @@ use regex_lite::Regex;
 
 #[cfg(target_os = "linux")]
 use assert_cmd::cargo::cargo_bin;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
+#[cfg(target_os = "linux")]
+use std::process::Command;
+#[cfg(target_os = "linux")]
+use std::process::Stdio;
+#[cfg(target_os = "linux")]
+use std::sync::LazyLock;
 
 pub mod responses;
 pub mod test_codex;
@@ -164,6 +172,39 @@ pub fn sandbox_network_env_var() -> &'static str {
     codex_core::spawn::CODEX_SANDBOX_NETWORK_DISABLED_ENV_VAR
 }
 
+#[cfg(target_os = "linux")]
+static LANDLOCK_AVAILABLE: LazyLock<bool> = LazyLock::new(|| {
+    use codex_protocol::protocol::SandboxPolicy;
+
+    let sandbox = cargo_bin("codex-linux-sandbox");
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let policy = match serde_json::to_string(&SandboxPolicy::ReadOnly) {
+        Ok(json) => json,
+        Err(_) => return false,
+    };
+
+    Command::new(sandbox)
+        .arg(cwd)
+        .arg(policy)
+        .arg("--")
+        .arg("/bin/true")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+});
+
+#[cfg(target_os = "linux")]
+pub fn landlock_available() -> bool {
+    *LANDLOCK_AVAILABLE
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn landlock_available() -> bool {
+    true
+}
+
 #[macro_export]
 macro_rules! skip_if_sandbox {
     () => {{
@@ -205,6 +246,22 @@ macro_rules! skip_if_no_network {
             println!(
                 "Skipping test because it cannot execute when network is disabled in a Codex sandbox."
             );
+            return $return_value;
+        }
+    }};
+}
+
+#[macro_export]
+macro_rules! skip_if_landlock_unavailable {
+    () => {{
+        if !$crate::landlock_available() {
+            eprintln!("Landlock unavailable, skipping test.");
+            return;
+        }
+    }};
+    ($return_value:expr $(,)?) => {{
+        if !$crate::landlock_available() {
+            eprintln!("Landlock unavailable, skipping test.");
             return $return_value;
         }
     }};
