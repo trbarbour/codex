@@ -17,7 +17,6 @@ use codex_core::ConversationManager;
 use codex_core::NewConversation;
 use codex_core::config::Config;
 use codex_core::config::ConfigOverrides;
-use codex_core::git_info::get_git_repo_root;
 use codex_core::protocol::AskForApproval;
 use codex_core::protocol::Event;
 use codex_core::protocol::EventMsg;
@@ -25,6 +24,7 @@ use codex_core::protocol::InputItem;
 use codex_core::protocol::Op;
 use codex_core::protocol::SessionSource;
 use codex_core::protocol::TaskCompleteEvent;
+use codex_core::revision_control::detect_revision_control;
 use codex_ollama::DEFAULT_OSS_MODEL;
 use codex_protocol::config_types::SandboxMode;
 use event_processor_with_human_output::EventProcessorWithHumanOutput;
@@ -239,8 +239,10 @@ pub async fn run_main(cli: Cli, codex_linux_sandbox_exe: Option<PathBuf>) -> any
     let default_effort = config.model_reasoning_effort;
     let default_summary = config.model_reasoning_summary;
 
-    if !skip_git_repo_check && get_git_repo_root(&default_cwd).is_none() {
-        eprintln!("Not inside a trusted directory and --skip-git-repo-check was not specified.");
+    if !skip_git_repo_check && detect_revision_control(&default_cwd).is_none() {
+        eprintln!(
+            "Not inside a Git or Darcs repository and --skip-git-repo-check was not specified."
+        );
         std::process::exit(1);
     }
 

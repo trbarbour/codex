@@ -17,7 +17,6 @@ use crate::config_types::ShellEnvironmentPolicy;
 use crate::config_types::ShellEnvironmentPolicyToml;
 use crate::config_types::Tui;
 use crate::config_types::UriBasedFileOpener;
-use crate::git_info::resolve_root_git_project_for_trust;
 use crate::model_family::ModelFamily;
 use crate::model_family::derive_default_model_family;
 use crate::model_family::find_family_for_model;
@@ -26,6 +25,7 @@ use crate::model_provider_info::built_in_model_providers;
 use crate::openai_model_info::get_model_info;
 use crate::protocol::AskForApproval;
 use crate::protocol::SandboxPolicy;
+use crate::revision_control::resolve_revision_control_project_for_trust;
 use anyhow::Context;
 use codex_app_server_protocol::Tools;
 use codex_app_server_protocol::UserSavedConfig;
@@ -908,10 +908,10 @@ impl ConfigToml {
             return true;
         }
 
-        // If cwd lives inside a git worktree, check whether the root git project
-        // (the primary repository working directory) is trusted. This lets
-        // worktrees inherit trust from the main project.
-        if let Some(root_project) = resolve_root_git_project_for_trust(resolved_cwd) {
+        // If cwd lives inside a revision-controlled project, check whether the
+        // repository root is trusted. This lets worktrees and other checkouts
+        // inherit trust from the main project.
+        if let Some(root_project) = resolve_revision_control_project_for_trust(resolved_cwd, None) {
             return is_path_trusted(&root_project);
         }
 
