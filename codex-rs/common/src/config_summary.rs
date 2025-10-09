@@ -1,5 +1,6 @@
 use codex_core::WireApi;
 use codex_core::config::Config;
+use codex_core::revision_control::detect_revision_control;
 
 use crate::sandbox_summary::summarize_sandbox_policy;
 
@@ -12,6 +13,13 @@ pub fn create_config_summary_entries(config: &Config) -> Vec<(&'static str, Stri
         ("approval", config.approval_policy.to_string()),
         ("sandbox", summarize_sandbox_policy(&config.sandbox_policy)),
     ];
+
+    let revision_summary = match detect_revision_control(&config.cwd) {
+        Some(info) => format!("{} ({})", info.kind.display_name(), info.root.display()),
+        None => "none".to_string(),
+    };
+    entries.push(("revision", revision_summary));
+
     if config.model_provider.wire_api == WireApi::Responses
         && config.model_family.supports_reasoning_summaries
     {

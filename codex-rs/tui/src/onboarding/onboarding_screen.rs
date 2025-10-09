@@ -1,6 +1,6 @@
 use codex_core::AuthManager;
 use codex_core::config::Config;
-use codex_core::git_info::get_git_repo_root;
+use codex_core::revision_control::detect_revision_control;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
@@ -103,8 +103,8 @@ impl OnboardingScreen {
                 auth_manager,
             }))
         }
-        let is_git_repo = get_git_repo_root(&cwd).is_some();
-        let highlighted = if is_git_repo {
+        let revision_control = detect_revision_control(&cwd);
+        let highlighted = if revision_control.is_some() {
             TrustDirectorySelection::Trust
         } else {
             // Default to not trusting the directory if it's not a git repo.
@@ -114,7 +114,7 @@ impl OnboardingScreen {
             steps.push(Step::TrustDirectory(TrustDirectoryWidget {
                 cwd,
                 codex_home,
-                is_git_repo,
+                revision_control: revision_control.clone(),
                 selection: None,
                 highlighted,
                 error: None,

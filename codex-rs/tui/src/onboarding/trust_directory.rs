@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use codex_core::config::set_project_trusted;
-use codex_core::git_info::resolve_root_git_project_for_trust;
+use codex_core::revision_control::DetectedRevisionControl;
+use codex_core::revision_control::resolve_revision_control_project_for_trust;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
@@ -24,7 +25,7 @@ use super::onboarding_screen::StepState;
 pub(crate) struct TrustDirectoryWidget {
     pub codex_home: PathBuf,
     pub cwd: PathBuf,
-    pub is_git_repo: bool,
+    pub revision_control: Option<DetectedRevisionControl>,
     pub selection: Option<TrustDirectorySelection>,
     pub highlighted: TrustDirectorySelection,
     pub error: Option<String>,
@@ -47,16 +48,23 @@ impl WidgetRef for &TrustDirectoryWidget {
             "".into(),
         ];
 
-        if self.is_git_repo {
-            lines.push(
-                "  Since this folder is version controlled, you may wish to allow Codex".into(),
-            );
-            lines.push("  to work in this folder without asking for approval.".into());
-        } else {
-            lines.push(
-                "  Since this folder is not version controlled, we recommend requiring".into(),
-            );
-            lines.push("  approval of all edits and commands.".into());
+        match self.revision_control.as_ref().map(|rc| rc.kind) {
+            Some(kind) => {
+                let name = kind.display_name();
+                lines.push(
+                    format!(
+                        "  Since this folder is managed by {name}, you may wish to allow Codex"
+                    )
+                    .into(),
+                );
+                lines.push("  to work in this folder without asking for approval.".into());
+            }
+            None => {
+                lines.push(
+                    "  Since this folder is not version controlled, we recommend requiring".into(),
+                );
+                lines.push("  approval of all edits and commands.".into());
+            }
         }
         lines.push("".into());
 
@@ -70,7 +78,7 @@ impl WidgetRef for &TrustDirectoryWidget {
                 }
             };
 
-        if self.is_git_repo {
+        if self.revision_control.is_some() {
             lines.push(create_option(
                 0,
                 TrustDirectorySelection::Trust,
@@ -144,7 +152,8 @@ impl StepStateProvider for TrustDirectoryWidget {
 impl TrustDirectoryWidget {
     fn handle_trust(&mut self) {
         let target =
-            resolve_root_git_project_for_trust(&self.cwd).unwrap_or_else(|| self.cwd.clone());
+            resolve_revision_control_project_for_trust(&self.cwd, self.revision_control.as_ref())
+                .unwrap_or_else(|| self.cwd.clone());
         if let Err(e) = set_project_trusted(&self.codex_home, &target) {
             tracing::error!("Failed to set project trusted: {e:?}");
             self.error = Some(format!("Failed to set trust for {}: {e}", target.display()));
@@ -174,7 +183,7 @@ mod tests {
         let mut widget = TrustDirectoryWidget {
             codex_home: PathBuf::from("."),
             cwd: PathBuf::from("."),
-            is_git_repo: false,
+            revision_control: None,
             selection: None,
             highlighted: TrustDirectorySelection::DontTrust,
             error: None,
