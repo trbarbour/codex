@@ -202,7 +202,7 @@ pub fn landlock_available() -> bool {
 
 #[cfg(not(target_os = "linux"))]
 pub fn landlock_available() -> bool {
-    true
+    false
 }
 
 #[macro_export]
