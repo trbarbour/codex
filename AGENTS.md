@@ -98,3 +98,6 @@ If you don’t have the tool:
   let request = mock.single_request();
   // assert using request.function_call_output(call_id) or request.json_body() or other helpers.
   ```
+
+### Tools
+The Codex environment exposes two optional automation hooks outside the repository itself: a Setup script that runs whenever the project workspace is first created (or restored from cache) and a Maintenance script that runs on every subsequent container start. Write/maintain suitable setup and maintenance helper scripts (in the repository), and I will point the hooks at them. You can configure these scripts so that they will set up everything you need before you start work (next time) on a task for this project. When the scripts run, they have full network access, so can install all necessary tools and dependencies.
