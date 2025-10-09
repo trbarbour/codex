@@ -9,7 +9,10 @@ implementation so the behavior can be replicated elsewhere.
   `--skip-git-repo-check` to protect users from destructive edits in ad-hoc directories.【F:docs/exec.md†L86-L88】
 * `codex_core::git_info::get_git_repo_root` walks up from the configured working directory until it finds a `.git`
   directory or file, allowing the application to decide whether Git features should be enabled without shelling out to
-  `git` itself.【F:codex-rs/core/src/git_info.rs†L17-L37】
+  `git` itself.【F:codex-rs/core/src/revision_control/git.rs†L1-L34】
+* `codex_core::revision_control::detect_revision_control` provides a single entry point for identifying the
+  repository backend. Today it returns Git repositories via the new abstraction, and future work will extend it to
+  recognise Darcs checkouts without forcing every caller to reimplement the detection logic.【F:codex-rs/core/src/revision_control/mod.rs†L1-L43】
 * When Codex is pointed at a non-Git directory, higher-level features such as ghost snapshots are disabled and the UI emits an
   informational message explaining why, preventing repeated failures.【F:codex-rs/tui/src/chatwidget.rs†L1288-L1322】
 

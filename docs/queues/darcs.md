@@ -2,6 +2,11 @@
 
 This queue tracks the Darcs support roadmap described in [docs/git-and-github.md](../git-and-github.md).
 
+Initial scaffolding for the abstraction now lives in
+`codex_core::revision_control`, which exposes a shared detection entry point
+so future Darcs-specific logic can slot in next to the existing Git
+implementation.【F:codex-rs/core/src/revision_control/mod.rs†L1-L43】
+
 ## Implementation roadmap & work queue
 
 ### 1. Abstract repository/revision detection
