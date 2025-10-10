@@ -81,9 +81,9 @@ codex exec "Extract details of the project" --output-schema ~/schema.json
 
 Combine `--output-schema` with `-o` to only print the final JSON output. You can also pass a file path to `-o` to save the JSON output to a file.
 
-### Git repository requirement
+### Revision control requirement
 
-Codex requires a Git repository to avoid destructive changes. To disable this check, use `codex exec --skip-git-repo-check`.
+Codex requires a Git or Darcs repository to avoid destructive changes. To disable this check when operating outside a supported checkout, use `codex exec --skip-git-repo-check`.
 
 ### Resuming non-interactive sessions
 
