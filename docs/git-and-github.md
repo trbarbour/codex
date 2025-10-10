@@ -35,10 +35,11 @@ wrapping every subprocess call in a five-second timeout.【F:codex-rs/core/src/g
 
 Two Rust components consume the metadata helpers to deliver user-facing functionality:
 
-* `codex_tui::get_git_diff` mirrors the legacy TypeScript CLI by returning a combined diff that includes tracked changes and
-  untracked files. It first checks whether Git is installed and the directory is a repository, then runs
+* `codex_tui::get_repo_diff` mirrors the legacy TypeScript CLI by returning a combined diff that includes tracked changes and
+  untracked files. It detects whether the workspace uses Git or Darcs, dispatching to the appropriate CLI. For Git it runs
   `git diff --color` and `git ls-files --others --exclude-standard` in parallel, synthesising `--no-index` diffs for each
-  untracked path.【F:codex-rs/tui/src/get_git_diff.rs†L1-L75】
+  untracked path. For Darcs it shells out to `darcs whatsnew --unified --color=always --look-for-adds` to capture both
+  recorded and unrecorded changes.【F:codex-rs/tui/src/get_repo_diff.rs†L1-L121】
 * The chat widget captures "ghost" snapshots before every user turn to enable undo. `create_ghost_commit` constructs a
   temporary index, stages the desired paths, writes the tree, and invokes `git commit-tree` with a synthetic identity, while
   `restore_ghost_commit` replays the snapshot back into the working tree via `git restore`.

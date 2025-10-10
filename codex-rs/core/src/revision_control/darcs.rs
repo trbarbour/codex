@@ -1,4 +1,5 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
 /// Return the Darcs repository root if the provided directory is inside a Darcs
 /// checkout.
