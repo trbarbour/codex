@@ -1,6 +1,6 @@
 # Darcs integration backlog
 
-This queue tracks the Darcs support roadmap described in [docs/git-and-github.md](../git-and-github.md).
+This queue tracks the Darcs support roadmap described in [docs/revision-control.md](../revision-control.md).
 
 Initial scaffolding for the abstraction now lives in
 `codex_core::revision_control`, which exposes a shared detection entry point
@@ -100,10 +100,10 @@ alongside GitHub releases.
 :::
 
 ### 8. Update documentation and configuration guidance
-Document Darcs setup, configuration flags, and feature parity in `docs/git-and-github.md`, onboarding guides, and config docs.
+Document Darcs setup, configuration flags, and feature parity in `docs/revision-control.md`, onboarding guides, and config docs.
 
 :::task-stub{title="Document Darcs support across guides"}
-1. Revise `docs/git-and-github.md`, `docs/exec.md`, and onboarding docs to describe dual-backend behaviour, CLI flags for
+1. Revise `docs/revision-control.md`, `docs/exec.md`, and onboarding docs to describe dual-backend behaviour, CLI flags for
    choosing revision control, and Darcs-specific workflows.
 2. Add configuration examples (e.g., selecting Darcs as default) to `docs/config.md` and update installation instructions to
    mention the `darcs` dependency.

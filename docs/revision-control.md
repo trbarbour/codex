@@ -1,7 +1,7 @@
-# Git and GitHub integration
+# Revision-control integrations
 
-Codex relies on Git for both runtime features and release automation. This document maps each integration point to the
-implementation so the behavior can be replicated elsewhere.
+Codex relies on revision-control backends for runtime features and release automation. This document maps each
+integration point to the implementation so the behavior can be replicated elsewhere.
 
 ## Repository prerequisites and detection
 
