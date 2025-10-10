@@ -75,7 +75,7 @@ use crate::diff_render::display_path_for;
 use crate::exec_cell::CommandOutput;
 use crate::exec_cell::ExecCell;
 use crate::exec_cell::new_active_exec_command;
-use crate::get_git_diff::get_git_diff;
+use crate::get_repo_diff::get_repo_diff;
 use crate::history_cell;
 use crate::history_cell::AgentMessageCell;
 use crate::history_cell::HistoryCell;
@@ -1140,13 +1140,19 @@ impl ChatWidget {
                 self.add_diff_in_progress();
                 let tx = self.app_event_tx.clone();
                 tokio::spawn(async move {
-                    let text = match get_git_diff().await {
-                        Ok((is_git_repo, diff_text)) => {
-                            if is_git_repo {
-                                diff_text
+                    let text = match get_repo_diff().await {
+                        Ok((Some(kind), diff_text)) => {
+                            if diff_text.trim().is_empty() {
+                                format!(
+                                    "`/diff` — _no pending changes in {} repository_",
+                                    kind.display_name().to_lowercase()
+                                )
                             } else {
-                                "`/diff` — _not inside a git repository_".to_string()
+                                diff_text
                             }
+                        }
+                        Ok((None, _)) => {
+                            "`/diff` — _not inside a Git or Darcs repository_".to_string()
                         }
                         Err(e) => format!("Failed to compute diff: {e}"),
                     };

@@ -114,7 +114,7 @@ impl OnboardingScreen {
             steps.push(Step::TrustDirectory(TrustDirectoryWidget {
                 cwd,
                 codex_home,
-                revision_control: revision_control.clone(),
+                revision_control,
                 selection: None,
                 highlighted,
                 error: None,

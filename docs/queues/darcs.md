@@ -44,7 +44,7 @@ respecting the existing timeout and parallelism patterns.
    default remote, named branch), list recent patches, and compute workspace diffs/untracked files.
 2. Mirror the timeout behaviour by wrapping Darcs subprocesses (e.g., `darcs show repo --xml`) and parse outputs into the
    shared `GitInfo`-like structures used by rollouts and the TUI.
-3. Replace TUI diff plumbing (`codex-rs/tui/src/get_git_diff.rs`) with backend selection logic so it dispatches to either Git or
+3. Replace TUI diff plumbing (`codex-rs/tui/src/get_repo_diff.rs`) with backend selection logic so it dispatches to either Git or
    Darcs implementations at runtime.
 :::
 
