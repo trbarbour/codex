@@ -9,6 +9,18 @@ logic can slot in next to the existing Git implementation.【F:codex-rs/core/src
 
 ## Implementation roadmap & work queue
 
+> **Status tracking.** Update this queue after each task (or subtask) is completed so future contributors can immediately see
+> what remains. Recording progress here is the canonical hand-off signal for Darcs work.
+
+### Progress overview
+
+| Task | Status | Notes |
+| --- | --- | --- |
+| 1. Abstract repository/revision detection | ✅ Completed | `codex_core::revision_control` now exposes the shared trait, detection helpers for Git/Darcs, and callers dispatch through `detect_revision_control`. 【F:codex-rs/core/src/revision_control/mod.rs†L1-L120】【F:codex-rs/tui/src/onboarding/onboarding_screen.rs†L1-L140】【F:codex-rs/exec/src/lib.rs†L1-L260】 |
+| 2. Factor existing Git helpers behind the abstraction | ⏳ Not started | `git_info` continues to operate as a Git-specific module and has not been adapted to implement the trait or share structures. |
+| 3. Implement a Darcs backend for metadata and diffs | ⚠️ Partially started | Diff dispatch detects Darcs in the TUI, but there is no Darcs metadata module or shared structures yet. 【F:codex-rs/tui/src/get_repo_diff.rs†L1-L121】 |
+| 4–9. Remaining roadmap items | ⏳ Not started | No code paths or docs reference Darcs snapshots, onboarding text, sandbox integration, environment detection, docs updates, or CI coverage yet. |
+
 ### 1. Abstract repository/revision detection
 Introduce a `RevisionControlSystem` trait that reports repository type, root, and capabilities. Update config loading, CLI
 gating, and trust onboarding to use the abstraction instead of `.git` probes.
