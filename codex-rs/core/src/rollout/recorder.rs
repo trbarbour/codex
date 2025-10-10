@@ -26,6 +26,8 @@ use super::policy::is_persisted_response_item;
 use crate::config::Config;
 use crate::default_client::originator;
 use crate::git_info::collect_git_info;
+use crate::revision_control::DetectedRevisionControl;
+use crate::revision_control::detect_revision_control;
 use codex_protocol::protocol::InitialHistory;
 use codex_protocol::protocol::ResumedHistory;
 use codex_protocol::protocol::RolloutItem;
@@ -150,8 +152,9 @@ impl RolloutRecorder {
             ),
         };
 
-        // Clone the cwd for the spawned task to collect git info asynchronously
+        // Clone the cwd for the spawned task to collect revision-control metadata asynchronously
         let cwd = config.cwd.clone();
+        let revision_control = detect_revision_control(&cwd);
 
         // A reasonably-sized bounded channel. If the buffer fills up the send
         // future will yield, which is fine – we only need to ensure we do not
@@ -161,7 +164,7 @@ impl RolloutRecorder {
         // Spawn a Tokio task that owns the file handle and performs async
         // writes. Using `tokio::fs::File` keeps everything on the async I/O
         // driver instead of blocking the runtime.
-        tokio::task::spawn(rollout_writer(file, rx, meta, cwd));
+        tokio::task::spawn(rollout_writer(file, rx, meta, cwd, revision_control));
 
         Ok(Self { tx, rollout_path })
     }
@@ -344,12 +347,17 @@ async fn rollout_writer(
     mut rx: mpsc::Receiver<RolloutCmd>,
     mut meta: Option<SessionMeta>,
     cwd: std::path::PathBuf,
+    revision_control: Option<DetectedRevisionControl>,
 ) -> std::io::Result<()> {
     let mut writer = JsonlWriter { file };
 
     // If we have a meta, collect git info asynchronously and write meta first
     if let Some(session_meta) = meta.take() {
-        let git_info = collect_git_info(&cwd).await;
+        let git_info = if let Some(backend) = revision_control.as_ref() {
+            collect_git_info(backend, &cwd).await
+        } else {
+            None
+        };
         let session_meta_line = SessionMetaLine {
             meta: session_meta,
             git: git_info,

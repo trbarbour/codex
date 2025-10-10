@@ -42,6 +42,7 @@ use codex_core::protocol::UserMessageEvent;
 use codex_core::protocol::ViewImageToolCallEvent;
 use codex_core::protocol::WebSearchBeginEvent;
 use codex_core::protocol::WebSearchEndEvent;
+use codex_core::revision_control::detect_revision_control;
 use codex_protocol::ConversationId;
 use codex_protocol::parse_command::ParsedCommand;
 use crossterm::event::KeyCode;
@@ -109,8 +110,7 @@ use codex_file_search::FileMatch;
 use codex_git_tooling::CreateGhostCommitOptions;
 use codex_git_tooling::GhostCommit;
 use codex_git_tooling::GitToolingError;
-use codex_git_tooling::create_ghost_commit;
-use codex_git_tooling::restore_ghost_commit;
+use codex_git_tooling::RepoSnapshotManager;
 use codex_protocol::plan_tool::UpdatePlanArgs;
 use strum::IntoEnumIterator;
 
@@ -1297,7 +1297,15 @@ impl ChatWidget {
         }
 
         let options = CreateGhostCommitOptions::new(&self.config.cwd);
-        match create_ghost_commit(&options) {
+        let result = if let Some(revision_control) = detect_revision_control(&self.config.cwd) {
+            RepoSnapshotManager::new(&revision_control).create_snapshot(&options)
+        } else {
+            Err(GitToolingError::NotAGitRepository {
+                path: self.config.cwd.clone(),
+            })
+        };
+
+        match result {
             Ok(commit) => {
                 self.ghost_snapshots.push(commit);
                 if self.ghost_snapshots.len() > MAX_TRACKED_GHOST_COMMITS {
@@ -1311,6 +1319,16 @@ impl ChatWidget {
                         "Snapshots disabled: current directory is not a Git repository."
                             .to_string(),
                         None,
+                    ),
+                    GitToolingError::UnsupportedRevisionControl { kind } => (
+                        format!(
+                            "Snapshots disabled: {} repositories are not supported.",
+                            kind.display_name()
+                        ),
+                        Some(
+                            "Switch to a Git repository and restart Codex to re-enable snapshots."
+                                .to_string(),
+                        ),
                     ),
                     _ => (
                         format!("Snapshots disabled after error: {err}"),
@@ -1332,7 +1350,15 @@ impl ChatWidget {
             return;
         };
 
-        if let Err(err) = restore_ghost_commit(&self.config.cwd, &commit) {
+        let result = if let Some(revision_control) = detect_revision_control(&self.config.cwd) {
+            RepoSnapshotManager::new(&revision_control).restore_snapshot(&self.config.cwd, &commit)
+        } else {
+            Err(GitToolingError::NotAGitRepository {
+                path: self.config.cwd.clone(),
+            })
+        };
+
+        if let Err(err) = result {
             self.add_error_message(format!("Failed to restore snapshot: {err}"));
             self.ghost_snapshots.push(commit);
             return;

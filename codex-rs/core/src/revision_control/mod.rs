@@ -48,7 +48,7 @@ impl RevisionControlCapabilities {
     }
 }
 
-pub trait RevisionControlSystem {
+pub trait RevisionControlSystem: Send + Sync {
     fn kind(&self) -> RevisionControlKind;
     fn root(&self) -> &Path;
     fn capabilities(&self) -> RevisionControlCapabilities;

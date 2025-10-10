@@ -1171,6 +1171,7 @@ name = "codex-git-tooling"
 version = "0.0.0"
 dependencies = [
  "assert_matches",
+ "codex-core",
  "pretty_assertions",
  "tempfile",
  "thiserror 2.0.16",

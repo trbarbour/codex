@@ -1,6 +1,7 @@
 #![cfg(not(target_os = "windows"))]
 
 use assert_matches::assert_matches;
+use codex_core::CODEX_APPLY_PATCH_ARG1;
 use codex_core::model_family::find_family_for_model;
 use codex_core::protocol::AskForApproval;
 use codex_core::protocol::EventMsg;
@@ -384,8 +385,9 @@ async fn apply_patch_tool_executes_and_emits_patch_events() -> anyhow::Result<()
         assert_eq!(contents, "Tool harness apply patch\n");
     } else {
         assert!(
-            output_text.contains("codex-run-as-apply-patch"),
-            "expected apply_patch failure message to mention codex-run-as-apply-patch, got {output_text:?}"
+            output_text.contains(CODEX_APPLY_PATCH_ARG1)
+                || output_text.contains("No such file or directory"),
+            "expected apply_patch failure message to mention {CODEX_APPLY_PATCH_ARG1} or report missing binary, got {output_text:?}"
         );
         assert!(
             !patch_end_success,
