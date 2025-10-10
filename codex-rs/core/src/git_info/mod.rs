@@ -61,6 +61,19 @@ mod tests {
         DetectedRevisionControl::new(RevisionControlKind::Git, root)
     }
 
+    fn configure_git_identity(repo_path: &Path) {
+        std::process::Command::new("git")
+            .current_dir(repo_path)
+            .args(["config", "user.name", "Codex Test User"])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .current_dir(repo_path)
+            .args(["config", "user.email", "codex-test@example.com"])
+            .output()
+            .unwrap();
+    }
+
     #[tokio::test]
     async fn collect_git_info_non_git_directory() {
         let temp_dir = tempdir().unwrap();
@@ -82,6 +95,8 @@ mod tests {
             .args(["init", "--initial-branch", "main"])
             .output()
             .unwrap();
+
+        configure_git_identity(repo_path);
 
         std::fs::write(repo_path.join("README.md"), "# Test Repo").unwrap();
 
@@ -116,6 +131,8 @@ mod tests {
             .args(["init", "--initial-branch", "main"])
             .output()
             .unwrap();
+
+        configure_git_identity(repo_path);
 
         std::fs::write(repo_path.join("README.md"), "# Test Repo").unwrap();
         std::process::Command::new("git")
@@ -158,6 +175,8 @@ mod tests {
             .args(["init", "--initial-branch", "main"])
             .output()
             .unwrap();
+
+        configure_git_identity(repo_path);
 
         std::fs::write(repo_path.join("README.md"), "# Test Repo").unwrap();
         std::process::Command::new("git")
