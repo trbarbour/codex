@@ -19,17 +19,17 @@ integration point to the implementation so the behavior can be replicated elsewh
 ## Collecting repository metadata
 
 The `codex_core::git_info` module centralizes Git queries and protects the UI from expensive or hanging processes by
-wrapping every subprocess call in a five-second timeout.【F:codex-rs/core/src/git_info.rs†L39-L118】 Key helpers include:
+wrapping every subprocess call in a five-second timeout.【F:codex-rs/core/src/git_info/mod.rs†L1-L29】 Key helpers include:
 
 * `collect_git_info`: concurrently collects the HEAD commit hash, current branch (ignoring detached HEAD), and the `origin`
-  remote URL via `git rev-parse`/`git remote get-url`, returning `None` when Git is unavailable.【F:codex-rs/core/src/git_info.rs†L45-L96】
+  remote URL via `git rev-parse`/`git remote get-url`, returning `None` when Git is unavailable.【F:codex-rs/core/src/git_info/git.rs†L27-L93】
 * `recent_commits`: shells out to `git log` with a stable `--pretty` format and parses the results into `(sha, timestamp,
-  subject)` tuples for pickers and history views.【F:codex-rs/core/src/git_info.rs†L100-L155】
+  subject)` tuples for pickers and history views.【F:codex-rs/core/src/git_info/git.rs†L94-L135】
 * `git_diff_to_remote`: identifies the nearest remote-tracking commit by enumerating remotes, inferring the default branch,
   and computing the diff between the working tree and that commit. The helper composes `get_git_remotes`,
-  `branch_ancestry`, `find_closest_sha`, and `diff_against_sha` to produce both the base SHA and a diff blob.【F:codex-rs/core/src/git_info.rs†L157-L321】
+  `branch_ancestry`, `find_closest_sha`, and `diff_against_sha` to produce both the base SHA and a diff blob.【F:codex-rs/core/src/git_info/git.rs†L137-L520】
 * `local_git_branches` and `current_branch_name` expose branch pickers by scraping `git branch` output and moving the default
-  branch (detected via symbolic refs or fallbacks to `main`/`master`) to the top of the list.【F:codex-rs/core/src/git_info.rs†L523-L604】
+  branch (detected via symbolic refs or fallbacks to `main`/`master`) to the top of the list.【F:codex-rs/core/src/git_info/git.rs†L520-L605】
 
 ## Workspace diffs and safety snapshots
 
@@ -40,11 +40,11 @@ Two Rust components consume the metadata helpers to deliver user-facing function
   `git diff --color` and `git ls-files --others --exclude-standard` in parallel, synthesising `--no-index` diffs for each
   untracked path. For Darcs it shells out to `darcs whatsnew --unified --color=always --look-for-adds` to capture both
   recorded and unrecorded changes.【F:codex-rs/tui/src/get_repo_diff.rs†L1-L121】
-* The chat widget captures "ghost" snapshots before every user turn to enable undo. `create_ghost_commit` constructs a
-  temporary index, stages the desired paths, writes the tree, and invokes `git commit-tree` with a synthetic identity, while
-  `restore_ghost_commit` replays the snapshot back into the working tree via `git restore`.
-  Errors (such as running outside a repo) are surfaced to the user and disable further snapshots until Codex restarts.
-  【F:codex-rs/git-tooling/src/ghost_commits.rs†L63-L170】【F:codex-rs/tui/src/chatwidget.rs†L1254-L1334】
+* The chat widget captures "ghost" snapshots before every user turn to enable undo. `RepoSnapshotManager` wraps the
+  Git-specific `create_ghost_commit`/`restore_ghost_commit` helpers so callers operate through the revision-control abstraction
+  while the implementation still stages the working tree with `git commit-tree` and restores via `git restore`.
+  Errors (such as running outside a repo or selecting an unsupported backend) are surfaced to the user and disable further
+  snapshots until Codex restarts.【F:codex-rs/git-tooling/src/lib.rs†L1-L166】【F:codex-rs/git-tooling/src/ghost_commits.rs†L63-L170】【F:codex-rs/tui/src/chatwidget.rs†L1255-L1342】
 
 `GitToolingError` provides structured error reporting for all ghost-snapshot helpers so that UI components can decide when to
 show hints or retry.【F:codex-rs/git-tooling/src/errors.rs†L8-L33】

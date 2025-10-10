@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::string::FromUtf8Error;
 
+use codex_core::revision_control::RevisionControlKind;
 use thiserror::Error;
 use walkdir::Error as WalkdirError;
 
@@ -32,4 +33,6 @@ pub enum GitToolingError {
     Walkdir(#[from] WalkdirError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("{kind:?} repositories are not supported for snapshot operations")]
+    UnsupportedRevisionControl { kind: RevisionControlKind },
 }

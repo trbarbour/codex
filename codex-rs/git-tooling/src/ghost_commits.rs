@@ -61,7 +61,7 @@ impl<'a> CreateGhostCommitOptions<'a> {
 }
 
 /// Create a ghost commit capturing the current state of the repository's working tree.
-pub fn create_ghost_commit(
+pub(crate) fn create_ghost_commit(
     options: &CreateGhostCommitOptions<'_>,
 ) -> Result<GhostCommit, GitToolingError> {
     ensure_git_repository(options.repo_path)?;
@@ -131,12 +131,15 @@ pub fn create_ghost_commit(
 }
 
 /// Restore the working tree to match the provided ghost commit.
-pub fn restore_ghost_commit(repo_path: &Path, commit: &GhostCommit) -> Result<(), GitToolingError> {
+pub(crate) fn restore_ghost_commit(
+    repo_path: &Path,
+    commit: &GhostCommit,
+) -> Result<(), GitToolingError> {
     restore_to_commit(repo_path, commit.id())
 }
 
 /// Restore the working tree to match the given commit ID.
-pub fn restore_to_commit(repo_path: &Path, commit_id: &str) -> Result<(), GitToolingError> {
+pub(crate) fn restore_to_commit(repo_path: &Path, commit_id: &str) -> Result<(), GitToolingError> {
     ensure_git_repository(repo_path)?;
 
     let repo_root = resolve_repository_root(repo_path)?;

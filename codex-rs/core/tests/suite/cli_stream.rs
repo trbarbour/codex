@@ -543,7 +543,9 @@ async fn integration_git_info_unit_test() {
         .unwrap();
 
     // 3. Test git info collection directly
-    let git_info = codex_core::git_info::collect_git_info(&git_repo).await;
+    let revision_control = codex_core::revision_control::detect_revision_control(&git_repo)
+        .expect("git repository should be detected");
+    let git_info = codex_core::git_info::collect_git_info(&revision_control, &git_repo).await;
 
     // 4. Verify git info is present and contains expected data
     assert!(git_info.is_some(), "Git info should be collected");

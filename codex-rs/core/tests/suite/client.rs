@@ -52,6 +52,30 @@ fn sse_completed(id: &str) -> String {
     load_sse_fixture_with_id("tests/fixtures/completed_template.json", id)
 }
 
+struct TempEnvVar {
+    key: String,
+}
+
+impl TempEnvVar {
+    fn new(value: &str) -> (String, Self) {
+        let key = format!("CODEX_TEST_ENV_{}", Uuid::new_v4());
+        unsafe {
+            // SAFETY: tests run in isolation and we remove the variable before dropping the guard.
+            std::env::set_var(&key, value);
+        }
+        (key.clone(), Self { key })
+    }
+}
+
+impl Drop for TempEnvVar {
+    fn drop(&mut self) {
+        unsafe {
+            // SAFETY: the variable was set by this guard and is removed before drop completes.
+            std::env::remove_var(&self.key);
+        }
+    }
+}
+
 #[expect(clippy::unwrap_used)]
 fn assert_message_role(request_body: &serde_json::Value, role: &str) {
     assert_eq!(request_body["role"].as_str().unwrap(), role);
@@ -1076,7 +1100,9 @@ async fn context_window_error_sets_total_tokens_to_model_window() -> anyhow::Res
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn azure_overrides_assign_properties_used_for_responses_url() {
     skip_if_no_network!();
-    let existing_env_var_with_random_value = if cfg!(windows) { "USERNAME" } else { "USER" };
+    let env_value = format!("token-{}", Uuid::new_v4());
+    let (existing_env_var_with_random_value, _env_guard) = TempEnvVar::new(&env_value);
+    let expected_auth_header = format!("Bearer {env_value}");
 
     // Mock server
     let server = MockServer::start().await;
@@ -1091,14 +1117,7 @@ async fn azure_overrides_assign_properties_used_for_responses_url() {
         .and(path("/openai/responses"))
         .and(query_param("api-version", "2025-04-01-preview"))
         .and(header_regex("Custom-Header", "Value"))
-        .and(header_regex(
-            "Authorization",
-            format!(
-                "Bearer {}",
-                std::env::var(existing_env_var_with_random_value).unwrap()
-            )
-            .as_str(),
-        ))
+        .and(header_regex("Authorization", expected_auth_header.as_str()))
         .respond_with(first)
         .expect(1)
         .mount(&server)
@@ -1108,7 +1127,7 @@ async fn azure_overrides_assign_properties_used_for_responses_url() {
         name: "custom".to_string(),
         base_url: Some(format!("{}/openai", server.uri())),
         // Reuse the existing environment variable to avoid using unsafe code
-        env_key: Some(existing_env_var_with_random_value.to_string()),
+        env_key: Some(existing_env_var_with_random_value.clone()),
         query_params: Some(std::collections::HashMap::from([(
             "api-version".to_string(),
             "2025-04-01-preview".to_string(),
@@ -1153,7 +1172,9 @@ async fn azure_overrides_assign_properties_used_for_responses_url() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn env_var_overrides_loaded_auth() {
     skip_if_no_network!();
-    let existing_env_var_with_random_value = if cfg!(windows) { "USERNAME" } else { "USER" };
+    let env_value = format!("token-{}", Uuid::new_v4());
+    let (existing_env_var_with_random_value, _env_guard) = TempEnvVar::new(&env_value);
+    let expected_auth_header = format!("Bearer {env_value}");
 
     // Mock server
     let server = MockServer::start().await;
@@ -1168,14 +1189,7 @@ async fn env_var_overrides_loaded_auth() {
         .and(path("/openai/responses"))
         .and(query_param("api-version", "2025-04-01-preview"))
         .and(header_regex("Custom-Header", "Value"))
-        .and(header_regex(
-            "Authorization",
-            format!(
-                "Bearer {}",
-                std::env::var(existing_env_var_with_random_value).unwrap()
-            )
-            .as_str(),
-        ))
+        .and(header_regex("Authorization", expected_auth_header.as_str()))
         .respond_with(first)
         .expect(1)
         .mount(&server)
@@ -1185,7 +1199,7 @@ async fn env_var_overrides_loaded_auth() {
         name: "custom".to_string(),
         base_url: Some(format!("{}/openai", server.uri())),
         // Reuse the existing environment variable to avoid using unsafe code
-        env_key: Some(existing_env_var_with_random_value.to_string()),
+        env_key: Some(existing_env_var_with_random_value.clone()),
         query_params: Some(std::collections::HashMap::from([(
             "api-version".to_string(),
             "2025-04-01-preview".to_string(),
