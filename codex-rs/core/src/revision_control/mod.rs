@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(detected.root, dir.path());
         assert_eq!(
             detected.capabilities,
-            RevisionControlCapabilities::new(true, false)
+            RevisionControlCapabilities::new(true, true)
         );
         if darcs::darcs_cli_available() {
             assert!(detected.tooling_error.is_none());
