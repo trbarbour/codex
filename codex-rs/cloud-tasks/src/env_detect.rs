@@ -1,6 +1,13 @@
+use codex_core::revision_control::RevisionControlKind;
+use codex_core::revision_control::detect_revision_control;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::HeaderMap;
 use std::collections::HashMap;
+use std::env;
+use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command;
 use tracing::info;
 use tracing::warn;
 
@@ -26,9 +33,9 @@ pub async fn autodetect_environment_id(
     headers: &HeaderMap,
     desired_label: Option<String>,
 ) -> anyhow::Result<AutodetectSelection> {
-    // 1) Try repo-specific environments based on local git origins (GitHub only, like VSCode)
-    let origins = get_git_origins();
-    crate::append_error_log(format!("env: git origins: {origins:?}"));
+    // 1) Try repo-specific environments based on local revision-control origins (GitHub only, like VSCode)
+    let origins = get_repo_origins();
+    crate::append_error_log(format!("env: repository origins: {origins:?}"));
     let mut by_repo_envs: Vec<CodeEnvironment> = Vec::new();
     for origin in &origins {
         if let Some((owner, repo)) = parse_owner_repo(origin) {
@@ -167,45 +174,113 @@ async fn get_json<T: serde::de::DeserializeOwned>(
     Ok(parsed)
 }
 
-fn get_git_origins() -> Vec<String> {
+fn get_repo_origins() -> Vec<String> {
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    if let Some(info) = detect_revision_control(&cwd) {
+        let root = info.root;
+        let root_ref = root.as_path();
+        return match info.kind {
+            RevisionControlKind::Git => get_git_origins(Some(root_ref)),
+            RevisionControlKind::Darcs => get_darcs_origins(root_ref),
+        };
+    }
+    get_git_origins(None)
+}
+
+fn get_git_origins(root: Option<&Path>) -> Vec<String> {
     // Prefer: git config --get-regexp remote\..*\.url
-    let out = std::process::Command::new("git")
-        .args(["config", "--get-regexp", "remote\\..*\\.url"])
-        .output();
-    if let Ok(ok) = out
-        && ok.status.success()
-    {
-        let s = String::from_utf8_lossy(&ok.stdout);
-        let mut urls = Vec::new();
-        for line in s.lines() {
-            if let Some((_, url)) = line.split_once(' ') {
-                urls.push(url.trim().to_string());
+    if let Some(output) = run_git_command(root, &["config", "--get-regexp", "remote\\..*\\.url"]) {
+        if output.status.success() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            let mut urls = Vec::new();
+            for line in s.lines() {
+                if let Some((_, url)) = line.split_once(' ') {
+                    urls.push(url.trim().to_string());
+                }
             }
-        }
-        if !urls.is_empty() {
-            return uniq(urls);
+            if !urls.is_empty() {
+                return uniq(urls);
+            }
         }
     }
     // Fallback: git remote -v
-    let out = std::process::Command::new("git")
-        .args(["remote", "-v"])
-        .output();
-    if let Ok(ok) = out
-        && ok.status.success()
-    {
-        let s = String::from_utf8_lossy(&ok.stdout);
-        let mut urls = Vec::new();
-        for line in s.lines() {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                urls.push(parts[1].to_string());
+    if let Some(output) = run_git_command(root, &["remote", "-v"]) {
+        if output.status.success() {
+            let s = String::from_utf8_lossy(&output.stdout);
+            let mut urls = Vec::new();
+            for line in s.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    urls.push(parts[1].to_string());
+                }
             }
-        }
-        if !urls.is_empty() {
-            return uniq(urls);
+            if !urls.is_empty() {
+                return uniq(urls);
+            }
         }
     }
     Vec::new()
+}
+
+fn get_darcs_origins(root: &Path) -> Vec<String> {
+    let mut urls = Vec::new();
+    let prefs = root.join("_darcs").join("prefs").join("repos");
+    if let Ok(contents) = fs::read_to_string(&prefs) {
+        for line in contents.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            if let Some(rest) = trimmed.strip_prefix("repo") {
+                let rest = rest
+                    .trim_start_matches(|c: char| c == ':' || c.is_whitespace())
+                    .trim();
+                if !rest.is_empty() {
+                    urls.push(rest.to_string());
+                }
+            }
+        }
+    }
+
+    if urls.is_empty() {
+        if let Some(output) = run_darcs_command(root, &["show", "repo"]) {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                for line in stdout.lines() {
+                    let trimmed = line.trim();
+                    if let Some(rest) = trimmed.strip_prefix("Default Remote:") {
+                        let url = rest.trim();
+                        if !url.is_empty() {
+                            urls.push(url.to_string());
+                        }
+                    } else if let Some(rest) = trimmed.strip_prefix("Default Remote") {
+                        let url = rest.trim_matches(':').trim();
+                        if !url.is_empty() {
+                            urls.push(url.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    uniq(urls)
+}
+
+fn run_git_command(root: Option<&Path>, args: &[&str]) -> Option<std::process::Output> {
+    let mut cmd = Command::new("git");
+    cmd.args(args);
+    if let Some(root) = root {
+        cmd.current_dir(root);
+    }
+    cmd.output().ok()
+}
+
+fn run_darcs_command(root: &Path, args: &[&str]) -> Option<std::process::Output> {
+    let mut cmd = Command::new("darcs");
+    cmd.args(args);
+    cmd.current_dir(root);
+    cmd.output().ok()
 }
 
 fn uniq(mut v: Vec<String>) -> Vec<String> {
@@ -259,7 +334,7 @@ pub async fn list_environments(
     let mut map: HashMap<String, crate::app::EnvironmentRow> = HashMap::new();
 
     // 1) By-repo lookup for each parsed GitHub origin
-    let origins = get_git_origins();
+    let origins = get_repo_origins();
     for origin in &origins {
         if let Some((owner, repo)) = parse_owner_repo(origin) {
             let url = if base_url.contains("/backend-api") {

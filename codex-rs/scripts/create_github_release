@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 
 REPO = "openai/codex"
@@ -37,6 +38,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--emergency-version-override",
         help="Publish a specific version because tag was created for the previous release but it never succeeded. Value should be semver, e.g., `0.43.0-alpha.9`.",
     )
+    parser.add_argument(
+        "--backend",
+        choices=["auto", "git", "darcs"],
+        default="auto",
+        help="Select the revision-control backend workflow to run (default: auto-detect).",
+    )
 
     args = parser.parse_args(argv[1:])
     if not (
@@ -52,44 +59,128 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+    detected_backend, repo_root = detect_repo_backend(None)
     try:
-        if args.emergency_version_override:
-            version = args.emergency_version_override
+        backend, root = resolve_backend(args.backend, detected_backend, repo_root)
+        if args.backend == "auto":
+            print(f"Detected {backend} repository at {root}")
+        if backend == "git":
+            run_git_release(args)
         else:
-            version = determine_version(args)
-        print(f"Publishing version {version}")
-        if args.dry_run:
-            return 0
-
-        print("Fetching branch head...")
-        base_commit = get_branch_head()
-        print(f"Base commit: {base_commit}")
-        print("Fetching commit tree...")
-        base_tree = get_commit_tree(base_commit)
-        print(f"Base tree: {base_tree}")
-        print("Fetching Cargo.toml...")
-        current_contents = fetch_file_contents(base_commit)
-        print("Updating version...")
-        updated_contents = replace_version(current_contents, version)
-        print("Creating blob...")
-        blob_sha = create_blob(updated_contents)
-        print(f"Blob SHA: {blob_sha}")
-        print("Creating tree...")
-        tree_sha = create_tree(base_tree, blob_sha)
-        print(f"Tree SHA: {tree_sha}")
-        print("Creating commit...")
-        commit_sha = create_commit(version, tree_sha, base_commit)
-        print(f"Commit SHA: {commit_sha}")
-        print("Creating tag...")
-        tag_sha = create_tag(version, commit_sha)
-        print(f"Tag SHA: {tag_sha}")
-        print("Creating tag ref...")
-        create_tag_ref(version, tag_sha)
-        print("Done.")
+            run_darcs_release(args, root)
     except ReleaseError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
     return 0
+
+
+def detect_repo_backend(start: Path | None) -> tuple[str | None, Path | None]:
+    base = Path.cwd() if start is None else start
+    for candidate in [base, *base.parents]:
+        git_dir = candidate / ".git"
+        if git_dir.exists():
+            return "git", candidate
+        darcs_dir = candidate / "_darcs"
+        if darcs_dir.exists():
+            return "darcs", candidate
+    return None, None
+
+
+def resolve_backend(
+    requested: str,
+    detected_backend: str | None,
+    repo_root: Path | None,
+) -> tuple[str, Path]:
+    if requested == "auto":
+        if detected_backend is None or repo_root is None:
+            raise ReleaseError(
+                "Unable to detect revision-control backend; run inside a Git or Darcs checkout or pass --backend."
+            )
+        return detected_backend, repo_root
+    if requested == "git":
+        if detected_backend not in (None, "git"):
+            raise ReleaseError("Git release requested but Darcs repository detected.")
+        if repo_root is None:
+            raise ReleaseError("Git release requested but no Git repository was found.")
+        return "git", repo_root
+    if requested == "darcs":
+        if detected_backend != "darcs" or repo_root is None:
+            raise ReleaseError("Darcs release requested but `_darcs` repository was not detected.")
+        return "darcs", repo_root
+    raise ReleaseError(f"Unsupported backend: {requested}")
+
+
+def run_git_release(args: argparse.Namespace) -> None:
+    if args.emergency_version_override:
+        version = args.emergency_version_override
+    else:
+        version = determine_version(args)
+    print(f"Publishing version {version}")
+    if args.dry_run:
+        return
+
+    print("Fetching branch head...")
+    base_commit = get_branch_head()
+    print(f"Base commit: {base_commit}")
+    print("Fetching commit tree...")
+    base_tree = get_commit_tree(base_commit)
+    print(f"Base tree: {base_tree}")
+    print("Fetching Cargo.toml...")
+    current_contents = fetch_file_contents(base_commit)
+    print("Updating version...")
+    updated_contents = replace_version(current_contents, version)
+    print("Creating blob...")
+    blob_sha = create_blob(updated_contents)
+    print(f"Blob SHA: {blob_sha}")
+    print("Creating tree...")
+    tree_sha = create_tree(base_tree, blob_sha)
+    print(f"Tree SHA: {tree_sha}")
+    print("Creating commit...")
+    commit_sha = create_commit(version, tree_sha, base_commit)
+    print(f"Commit SHA: {commit_sha}")
+    print("Creating tag...")
+    tag_sha = create_tag(version, commit_sha)
+    print(f"Tag SHA: {tag_sha}")
+    print("Creating tag ref...")
+    create_tag_ref(version, tag_sha)
+    print("Done.")
+
+
+def run_darcs_release(args: argparse.Namespace, repo_root: Path) -> None:
+    if args.emergency_version_override:
+        version = args.emergency_version_override
+    else:
+        version = determine_version(args)
+    print(f"Publishing version {version}")
+    if args.dry_run:
+        return
+
+    tag_name = f"rust-v{version}"
+    print(f"Tagging Darcs repository with {tag_name}...")
+    run_darcs_cli(repo_root, ["tag", tag_name])
+    print("Pushing Darcs changes to the default remote...")
+    run_darcs_cli(repo_root, ["push", "--all"])
+    print("Done.")
+
+
+def run_darcs_cli(repo_root: Path, args: list[str]) -> None:
+    command = ["darcs", *args]
+    try:
+        result = subprocess.run(
+            command,
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        raise ReleaseError("darcs CLI is not available in PATH.") from error
+
+    if result.returncode != 0:
+        message = result.stderr.strip() or result.stdout.strip() or (
+            f"exit code {result.returncode}"
+        )
+        raise ReleaseError(f"darcs {' '.join(args)} failed: {message}")
 
 
 class ReleaseError(RuntimeError):

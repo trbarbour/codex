@@ -12,12 +12,14 @@ integration point to the implementation so the behavior can be replicated elsewh
   `git` itself.【F:codex-rs/core/src/revision_control/git.rs†L1-L34】
 * `codex_core::revision_control::detect_revision_control` provides a single entry point for identifying the
   repository backend and now recognises both Git and Darcs checkouts without forcing every caller to reimplement the
-  detection logic.【F:codex-rs/core/src/revision_control/mod.rs†L1-L125】
+  detection logic.【F:codex-rs/core/src/revision_control/mod.rs†L1-L208】
 * When Codex discovers a Darcs checkout it verifies that the `darcs` CLI is available, emits a friendly warning when
   the executable is missing, and records the message so onboarding and config summaries can surface actionable
-  guidance.【F:codex-rs/core/src/revision_control/darcs.rs†L1-L63】【F:codex-rs/common/src/config_summary.rs†L1-L40】【F:codex-rs/tui/src/onboarding/onboarding_screen.rs†L86-L134】
-* When Codex is pointed at a non-Git directory, higher-level features such as ghost snapshots are disabled and the UI emits an
-  informational message explaining why, preventing repeated failures.【F:codex-rs/tui/src/chatwidget.rs†L1288-L1322】
+  guidance.【F:codex-rs/core/src/revision_control/darcs.rs†L1-L209】【F:codex-rs/common/src/config_summary.rs†L1-L40】【F:codex-rs/tui/src/onboarding/onboarding_screen.rs†L86-L134】
+* Environment detection merges Git remotes with Darcs repository preferences by parsing `_darcs/prefs/repos`, allowing cloud
+  flows to match the active workspace regardless of backend.【F:codex-rs/cloud-tasks/src/env_detect.rs†L1-L250】
+* When Codex is pointed at a directory without a supported backend, higher-level features such as ghost snapshots are disabled
+  and the UI emits an informational message explaining why, preventing repeated failures.【F:codex-rs/tui/src/chatwidget.rs†L1255-L1342】
 
 ## Collecting repository metadata
 
@@ -44,10 +46,10 @@ Two Rust components consume the metadata helpers to deliver user-facing function
   untracked path. For Darcs it shells out to `darcs whatsnew --unified --color=always --look-for-adds` to capture both
   recorded and unrecorded changes.【F:codex-rs/tui/src/get_repo_diff.rs†L1-L121】
 * The chat widget captures "ghost" snapshots before every user turn to enable undo. `RepoSnapshotManager` wraps the
-  Git-specific `create_ghost_commit`/`restore_ghost_commit` helpers so callers operate through the revision-control abstraction
-  while the implementation still stages the working tree with `git commit-tree` and restores via `git restore`.
-  Errors (such as running outside a repo or selecting an unsupported backend) are surfaced to the user and disable further
-  snapshots until Codex restarts.【F:codex-rs/git-tooling/src/lib.rs†L1-L166】【F:codex-rs/git-tooling/src/ghost_commits.rs†L63-L170】【F:codex-rs/tui/src/chatwidget.rs†L1255-L1342】
+  Git-specific `create_ghost_commit`/`restore_ghost_commit` helpers and the Darcs archive workflow so callers operate through
+  the revision-control abstraction while the implementations stage commit-tree snapshots for Git or persist patch bundles for
+  Darcs. Errors (such as running outside a repo or selecting an unsupported backend) are surfaced to the user and disable
+  further snapshots until Codex restarts.【F:codex-rs/git-tooling/src/lib.rs†L1-L260】【F:codex-rs/git-tooling/src/ghost_commits.rs†L63-L170】【F:codex-rs/git-tooling/src/darcs_snapshots.rs†L1-L260】【F:codex-rs/tui/src/chatwidget.rs†L1200-L1342】
 
 `GitToolingError` provides structured error reporting for all ghost-snapshot helpers so that UI components can decide when to
 show hints or retry.【F:codex-rs/git-tooling/src/errors.rs†L8-L33】
@@ -55,12 +57,16 @@ show hints or retry.【F:codex-rs/git-tooling/src/errors.rs†L8-L33】
 ## GitHub release automation
 
 Codex administrators publish binaries via the `codex-rs/scripts/create_github_release` helper. The script drives the GitHub API
-through the `gh` CLI to:
+through the `gh` CLI when run in Git workspaces and shells out to Darcs when invoked from `_darcs` checkouts. The Git workflow
+performs the following steps:
 
 1. Discover the `main` branch head and associated tree.
 2. Fetch and rewrite `codex-rs/Cargo.toml` with the target version.
 3. Upload the new blob, graft it onto the original tree, and create a commit tagged `rust-v<version>`.
-4. Create an annotated tag object and a matching ref pointing at the commit.【F:codex-rs/scripts/create_github_release†L1-L151】
+4. Create an annotated tag object and a matching ref pointing at the commit.【F:codex-rs/scripts/create_github_release†L1-L233】
+
+In a Darcs checkout the helper validates the backend selection, tags the workspace with `darcs tag`, and pushes the changes to
+the default remote via `darcs push`, emitting clear errors when the CLI is unavailable or returns a failure code.【F:codex-rs/scripts/create_github_release†L233-L343】
 
 The public release process relies on a dedicated GitHub Actions workflow triggered by that tag; the follow-up steps for npm and
 Homebrew are tracked in `docs/release_management.md` for human operators.【F:docs/release_management.md†L1-L40】
