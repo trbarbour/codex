@@ -376,6 +376,10 @@ impl SandboxPolicy {
                         if top_level_git.is_dir() {
                             subpaths.push(top_level_git);
                         }
+                        let top_level_darcs = writable_root.join("_darcs");
+                        if top_level_darcs.is_dir() {
+                            subpaths.push(top_level_darcs);
+                        }
                         WritableRoot {
                             root: writable_root,
                             read_only_subpaths: subpaths,
