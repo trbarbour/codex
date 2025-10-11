@@ -114,12 +114,12 @@ pub async fn workspace_diff(cwd: &Path) -> io::Result<String> {
 }
 
 async fn latest_patch_hash(cwd: &Path) -> Option<String> {
-    if let Ok(output) = run_darcs_capture(cwd, ["changes", "--last=1", "--xml"]).await
-        && output.status.success()
-    {
-        let text = String::from_utf8_lossy(&output.stdout);
-        if let Some(hash) = find_attr_value(&text, "hash") {
-            return Some(hash);
+    if let Ok(output) = run_darcs_capture(cwd, ["changes", "--last=1", "--xml"]).await {
+        if output.status.success() {
+            let text = String::from_utf8_lossy(&output.stdout);
+            if let Some(hash) = find_attr_value(&text, "hash") {
+                return Some(hash);
+            }
         }
     }
 

@@ -10,7 +10,8 @@ logic can slot in next to the existing Git implementation.【F:codex-rs/core/src
 ## Implementation roadmap & work queue
 
 > **Status tracking.** Update this queue after each task (or subtask) is completed so future contributors can immediately see
-> what remains. Recording progress here is the canonical hand-off signal for Darcs work.
+> what remains. Recording progress here is the canonical hand-off signal for Darcs work. Every piece of work should be compiled
+> and tested before it is marked done.
 
 ### Progress overview
 
