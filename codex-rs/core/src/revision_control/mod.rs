@@ -43,7 +43,7 @@ impl RevisionControlCapabilities {
     const fn for_kind(kind: RevisionControlKind) -> Self {
         match kind {
             RevisionControlKind::Git => Self::new(true, true),
-            RevisionControlKind::Darcs => Self::new(true, false),
+            RevisionControlKind::Darcs => Self::new(true, true),
         }
     }
 }

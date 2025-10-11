@@ -48,7 +48,9 @@ use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::process::Command;
 use tempfile::NamedTempFile;
+use tempfile::tempdir;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::unbounded_channel;
 
@@ -283,8 +285,8 @@ fn make_chatwidget_manual() -> (
         suppress_session_configured_redraw: false,
         pending_notification: None,
         is_review_mode: false,
-        ghost_snapshots: Vec::new(),
-        ghost_snapshots_disabled: false,
+        repo_snapshots: Vec::new(),
+        snapshots_disabled: false,
         needs_final_message_separator: false,
         last_rendered_width: std::cell::Cell::new(None),
     };
@@ -946,12 +948,46 @@ fn review_custom_prompt_escape_navigates_back_then_dismisses() {
 async fn review_branch_picker_escape_navigates_back_then_dismisses() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual();
 
+    // Create a temporary git repository so the branch picker is available.
+    let repo = tempdir().unwrap();
+    let cwd = repo.path();
+    assert!(
+        Command::new("git")
+            .args(["init", "--quiet"])
+            .current_dir(cwd)
+            .status()
+            .expect("git init")
+            .success(),
+        "failed to initialize git repository"
+    );
+    for (key, value) in [("user.email", "codex@example.com"), ("user.name", "Codex")] {
+        assert!(
+            Command::new("git")
+                .args(["config", key, value])
+                .current_dir(cwd)
+                .status()
+                .expect("git config")
+                .success(),
+            "failed to configure git {key}"
+        );
+    }
+    assert!(
+        Command::new("git")
+            .args(["commit", "--allow-empty", "-m", "initial"])
+            .current_dir(cwd)
+            .status()
+            .expect("git commit")
+            .success(),
+        "failed to create initial commit"
+    );
+
+    chat.config.cwd = cwd.to_path_buf();
+
     // Open the Review presets parent popup.
     chat.open_review_popup();
 
-    // Open the branch picker submenu (child view). Using a temp cwd with no git repo is fine.
-    let cwd = std::env::temp_dir();
-    chat.show_review_branch_picker(&cwd).await;
+    // Open the branch picker submenu (child view).
+    chat.show_review_branch_picker(cwd).await;
 
     // Verify child view header.
     let header = render_bottom_first_row(&chat, 60);
