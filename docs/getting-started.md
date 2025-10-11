@@ -1,5 +1,8 @@
 ## Getting started
 
+> **Note:** Codex shells out to the `darcs` CLI when you open a Darcs repository. Install `darcs`
+> via your package manager first; Codex will warn you at startup if the executable is missing.
+
 ### CLI usage
 
 | Command            | Purpose                            | Example                         |

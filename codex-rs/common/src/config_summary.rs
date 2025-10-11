@@ -14,11 +14,16 @@ pub fn create_config_summary_entries(config: &Config) -> Vec<(&'static str, Stri
         ("sandbox", summarize_sandbox_policy(&config.sandbox_policy)),
     ];
 
-    let revision_summary = match detect_revision_control(&config.cwd) {
+    let revision_control = detect_revision_control(&config.cwd);
+    let revision_summary = match revision_control.as_ref() {
         Some(info) => format!("{} ({})", info.kind.display_name(), info.root.display()),
         None => "none".to_string(),
     };
     entries.push(("revision", revision_summary));
+
+    if let Some(tooling_error) = revision_control.and_then(|info| info.tooling_error) {
+        entries.push(("revision warning", tooling_error));
+    }
 
     if config.model_provider.wire_api == WireApi::Responses
         && config.model_family.supports_reasoning_summaries

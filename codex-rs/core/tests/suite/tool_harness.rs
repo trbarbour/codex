@@ -386,8 +386,9 @@ async fn apply_patch_tool_executes_and_emits_patch_events() -> anyhow::Result<()
     } else {
         assert!(
             output_text.contains(CODEX_APPLY_PATCH_ARG1)
-                || output_text.contains("No such file or directory"),
-            "expected apply_patch failure message to mention {CODEX_APPLY_PATCH_ARG1} or report missing binary, got {output_text:?}"
+                || output_text.contains("No such file or directory")
+                || output_text.contains("codex-run-as-apply-patch"),
+            "expected apply_patch failure message to mention {CODEX_APPLY_PATCH_ARG1}, report a missing binary, or reference the codex-run-as-apply-patch flag, got {output_text:?}"
         );
         assert!(
             !patch_end_success,

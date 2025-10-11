@@ -12,7 +12,10 @@ integration point to the implementation so the behavior can be replicated elsewh
   `git` itself.【F:codex-rs/core/src/revision_control/git.rs†L1-L34】
 * `codex_core::revision_control::detect_revision_control` provides a single entry point for identifying the
   repository backend and now recognises both Git and Darcs checkouts without forcing every caller to reimplement the
-  detection logic.【F:codex-rs/core/src/revision_control/mod.rs†L1-L57】
+  detection logic.【F:codex-rs/core/src/revision_control/mod.rs†L1-L125】
+* When Codex discovers a Darcs checkout it verifies that the `darcs` CLI is available, emits a friendly warning when
+  the executable is missing, and records the message so onboarding and config summaries can surface actionable
+  guidance.【F:codex-rs/core/src/revision_control/darcs.rs†L1-L63】【F:codex-rs/common/src/config_summary.rs†L1-L40】【F:codex-rs/tui/src/onboarding/onboarding_screen.rs†L86-L134】
 * When Codex is pointed at a non-Git directory, higher-level features such as ghost snapshots are disabled and the UI emits an
   informational message explaining why, preventing repeated failures.【F:codex-rs/tui/src/chatwidget.rs†L1288-L1322】
 
