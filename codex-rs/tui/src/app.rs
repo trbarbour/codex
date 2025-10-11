@@ -290,20 +290,28 @@ impl App {
                 return Ok(false);
             }
             AppEvent::CodexOp(op) => self.chat_widget.submit_op(op),
-            AppEvent::DiffResult(text) => {
+            AppEvent::DiffResult { kind, text } => {
                 // Clear the in-progress state in the bottom pane
                 self.chat_widget.on_diff_complete();
                 // Enter alternate screen using TUI helper and build pager lines
                 let _ = tui.enter_alt_screen();
                 let pager_lines: Vec<ratatui::text::Line<'static>> = if text.trim().is_empty() {
-                    vec!["No changes detected.".italic().into()]
+                    if let Some(kind) = kind {
+                        vec![
+                            format!("No changes detected in {} repository.", kind.display_name())
+                                .italic()
+                                .into(),
+                        ]
+                    } else {
+                        vec!["No changes detected.".italic().into()]
+                    }
                 } else {
                     text.lines().map(ansi_escape_line).collect()
                 };
-                self.overlay = Some(Overlay::new_static_with_lines(
-                    pager_lines,
-                    "D I F F".to_string(),
-                ));
+                let title = kind
+                    .map(|k| format!("{} D I F F", k.display_name().to_uppercase()))
+                    .unwrap_or_else(|| "D I F F".to_string());
+                self.overlay = Some(Overlay::new_static_with_lines(pager_lines, title));
                 tui.frame_requester().schedule_frame();
             }
             AppEvent::StartFileSearch(query) => {
