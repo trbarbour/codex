@@ -996,6 +996,8 @@ pub struct SessionMetaLine {
     #[serde(flatten)]
     pub meta: SessionMeta,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision_control: Option<RevisionControlSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub git: Option<GitInfo>,
 }
 
@@ -1055,6 +1057,37 @@ pub struct GitInfo {
     /// Repository URL (if available from remote)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repository_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum RevisionControlBackend {
+    Git,
+    Darcs,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+pub struct DarcsInfo {
+    /// Identifier of the latest applied patch (if available).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub patch_hash: Option<String>,
+    /// Active named branch reported by Darcs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// Default remote repository configured for the checkout.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_remote: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, TS)]
+pub struct RevisionControlSummary {
+    pub kind: RevisionControlBackend,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub git: Option<GitInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub darcs: Option<DarcsInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tooling_error: Option<String>,
 }
 
 /// Review request sent to the review session.

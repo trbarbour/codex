@@ -25,8 +25,8 @@ use super::list::get_conversations;
 use super::policy::is_persisted_response_item;
 use crate::config::Config;
 use crate::default_client::originator;
-use crate::git_info::collect_git_info;
 use crate::revision_control::DetectedRevisionControl;
+use crate::revision_control::collect_revision_control_summary;
 use crate::revision_control::detect_revision_control;
 use codex_protocol::protocol::InitialHistory;
 use codex_protocol::protocol::ResumedHistory;
@@ -353,13 +353,17 @@ async fn rollout_writer(
 
     // If we have a meta, collect git info asynchronously and write meta first
     if let Some(session_meta) = meta.take() {
-        let git_info = if let Some(backend) = revision_control.as_ref() {
-            collect_git_info(backend, &cwd).await
+        let (revision_control_summary, git_info) = if let Some(backend) = revision_control.as_ref()
+        {
+            let summary = collect_revision_control_summary(backend, &cwd).await;
+            let git = summary.as_ref().and_then(|info| info.git.clone());
+            (summary, git)
         } else {
-            None
+            (None, None)
         };
         let session_meta_line = SessionMetaLine {
             meta: session_meta,
+            revision_control: revision_control_summary,
             git: git_info,
         };
 

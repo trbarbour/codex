@@ -2,6 +2,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use crate::git_info;
+use codex_protocol::protocol::RevisionControlBackend;
+use codex_protocol::protocol::RevisionControlSummary;
 
 pub mod darcs;
 pub mod git;
@@ -41,9 +43,7 @@ impl RevisionControlCapabilities {
     const fn for_kind(kind: RevisionControlKind) -> Self {
         match kind {
             RevisionControlKind::Git => Self::new(true, true),
-            // Darcs support is a work in progress. Report capabilities as disabled
-            // until the dedicated implementations land.
-            RevisionControlKind::Darcs => Self::new(false, false),
+            RevisionControlKind::Darcs => Self::new(true, false),
         }
     }
 }
@@ -55,6 +55,10 @@ pub trait RevisionControlSystem: Send + Sync {
 
     fn display_name(&self) -> &'static str {
         self.kind().display_name()
+    }
+
+    fn tooling_error(&self) -> Option<&str> {
+        None
     }
 }
 
@@ -99,6 +103,10 @@ impl RevisionControlSystem for DetectedRevisionControl {
     fn capabilities(&self) -> RevisionControlCapabilities {
         self.capabilities
     }
+
+    fn tooling_error(&self) -> Option<&str> {
+        self.tooling_error.as_deref()
+    }
 }
 
 /// Attempt to detect the revision control backend rooted at `base_dir`.
@@ -115,6 +123,36 @@ pub fn detect_revision_control(base_dir: &Path) -> Option<DetectedRevisionContro
             tooling_error,
         )
     })
+}
+
+pub async fn collect_revision_control_summary(
+    backend: &dyn RevisionControlSystem,
+    cwd: &Path,
+) -> Option<RevisionControlSummary> {
+    let tooling_error = backend
+        .tooling_error()
+        .map(std::string::ToString::to_string);
+
+    match backend.kind() {
+        RevisionControlKind::Git => {
+            let git_info = git_info::collect_git_info(backend, cwd).await;
+            Some(RevisionControlSummary {
+                kind: RevisionControlBackend::Git,
+                git: git_info,
+                darcs: None,
+                tooling_error,
+            })
+        }
+        RevisionControlKind::Darcs => {
+            let darcs_info = darcs::collect_darcs_info(cwd).await;
+            Some(RevisionControlSummary {
+                kind: RevisionControlBackend::Darcs,
+                git: None,
+                darcs: darcs_info,
+                tooling_error,
+            })
+        }
+    }
 }
 
 pub fn resolve_revision_control_project_for_trust(
@@ -180,7 +218,7 @@ mod tests {
         assert_eq!(detected.root, dir.path());
         assert_eq!(
             detected.capabilities,
-            RevisionControlCapabilities::new(false, false)
+            RevisionControlCapabilities::new(true, false)
         );
         if darcs::darcs_cli_available() {
             assert!(detected.tooling_error.is_none());
