@@ -534,6 +534,7 @@ async fn test_tail_includes_last_response_items() -> Result<()> {
                 cli_version: "test_version".into(),
                 source: SessionSource::VSCode,
             },
+            revision_control: None,
             git: None,
         }),
     };
@@ -618,6 +619,7 @@ async fn test_tail_handles_short_sessions() -> Result<()> {
                 cli_version: "test_version".into(),
                 source: SessionSource::VSCode,
             },
+            revision_control: None,
             git: None,
         }),
     };
@@ -703,6 +705,7 @@ async fn test_tail_skips_trailing_non_responses() -> Result<()> {
                 cli_version: "test_version".into(),
                 source: SessionSource::VSCode,
             },
+            revision_control: None,
             git: None,
         }),
     };

@@ -11,13 +11,10 @@ use std::path::Path;
 use std::process::Stdio;
 
 use codex_core::revision_control::RevisionControlKind;
+use codex_core::revision_control::darcs;
 use codex_core::revision_control::detect_revision_control;
 use tokio::process::Command;
 use tokio::task::JoinSet;
-use tokio::time::Duration as TokioDuration;
-use tokio::time::timeout;
-
-const DARCS_COMMAND_TIMEOUT: TokioDuration = TokioDuration::from_secs(5);
 
 /// Return value of [`get_repo_diff`].
 ///
@@ -33,7 +30,7 @@ pub(crate) async fn get_repo_diff() -> io::Result<(Option<RevisionControlKind>, 
 
     let diff = match detected.kind {
         RevisionControlKind::Git => get_git_diff(&cwd).await?,
-        RevisionControlKind::Darcs => get_darcs_diff(&cwd).await?,
+        RevisionControlKind::Darcs => darcs::workspace_diff(&cwd).await?,
     };
 
     Ok((Some(detected.kind), diff))
@@ -94,29 +91,6 @@ async fn get_git_diff(cwd: &Path) -> io::Result<String> {
     }
 
     Ok(format!("{tracked_diff}{untracked_diff}"))
-}
-
-async fn get_darcs_diff(cwd: &Path) -> io::Result<String> {
-    let output = timeout(
-        DARCS_COMMAND_TIMEOUT,
-        Command::new("darcs")
-            .args(["whatsnew", "--unified", "--color=always", "--look-for-adds"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .current_dir(cwd)
-            .output(),
-    )
-    .await
-    .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "darcs whatsnew timed out"))??;
-
-    if output.status.success() || output.status.code() == Some(1) {
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        Err(io::Error::other(format!(
-            "darcs whatsnew failed with status {}",
-            output.status
-        )))
-    }
 }
 
 /// Helper that executes `git` with the given `args` and returns `stdout` as a
