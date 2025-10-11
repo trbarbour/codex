@@ -14,6 +14,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Install darcs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y darcs
+          sudo rm -rf /var/lib/apt/lists/*
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:

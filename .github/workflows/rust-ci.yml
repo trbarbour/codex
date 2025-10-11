@@ -143,6 +143,31 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+      - name: Install darcs (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y darcs
+          sudo rm -rf /var/lib/apt/lists/*
+      - name: Install darcs (macOS)
+        if: runner.os == 'macOS'
+        run: brew install darcs
+      - name: Install darcs (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Get-Command darcs -ErrorAction SilentlyContinue) {
+            Write-Host 'darcs already installed'
+          } else {
+            choco install -y darcs --no-progress
+            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
+              Write-Host "Chocolatey install failed (exit $LASTEXITCODE), attempting winget..."
+              winget install --id Darcs.Darcs -e --accept-package-agreements --accept-source-agreements
+              if ($LASTEXITCODE -ne 0) {
+                throw 'Failed to install darcs via Chocolatey or winget.'
+              }
+            }
+          }
       - uses: dtolnay/rust-toolchain@1.90
         with:
           targets: ${{ matrix.target }}

@@ -106,6 +106,7 @@ mod tests {
             kind: RevisionControlKind::Git,
             root: root.to_path_buf(),
             capabilities: RevisionControlCapabilities::new(true, true),
+            tooling_error: None,
         }
     }
 

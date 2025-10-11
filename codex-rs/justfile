@@ -34,6 +34,31 @@ clippy:
 install:
     rustup show active-toolchain
     cargo fetch
+    if command -v darcs >/dev/null 2>&1; then
+    echo "darcs already installed"
+    elif command -v brew >/dev/null 2>&1; then
+    brew install darcs
+    elif command -v apt-get >/dev/null 2>&1; then
+    if command -v sudo >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y darcs
+    else
+    apt-get update
+    apt-get install -y darcs
+    fi
+    elif command -v choco >/dev/null 2>&1; then
+    if ! choco install -y darcs --no-progress; then
+    if command -v winget >/dev/null 2>&1; then
+    winget install --id Darcs.Darcs -e --accept-package-agreements --accept-source-agreements
+    else
+    echo "Install darcs from https://darcs.net/download to enable Darcs repositories"
+    fi
+    fi
+    elif command -v winget >/dev/null 2>&1; then
+    winget install --id Darcs.Darcs -e --accept-package-agreements --accept-source-agreements
+    else
+    echo "Install darcs from https://darcs.net/download to enable Darcs repositories"
+    fi
 
 # Run `cargo nextest` since it's faster than `cargo test`, though including
 # --no-fail-fast is important to ensure all tests are run.

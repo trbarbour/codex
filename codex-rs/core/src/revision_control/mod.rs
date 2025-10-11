@@ -64,15 +64,25 @@ pub struct DetectedRevisionControl {
     pub kind: RevisionControlKind,
     pub root: PathBuf,
     pub capabilities: RevisionControlCapabilities,
+    pub tooling_error: Option<String>,
 }
 
 impl DetectedRevisionControl {
     pub fn new(kind: RevisionControlKind, root: PathBuf) -> Self {
+        Self::new_with_tooling_error(kind, root, None)
+    }
+
+    pub fn new_with_tooling_error(
+        kind: RevisionControlKind,
+        root: PathBuf,
+        tooling_error: Option<String>,
+    ) -> Self {
         let capabilities = RevisionControlCapabilities::for_kind(kind);
         Self {
             kind,
             root,
             capabilities,
+            tooling_error,
         }
     }
 }
@@ -97,8 +107,14 @@ pub fn detect_revision_control(base_dir: &Path) -> Option<DetectedRevisionContro
         return Some(DetectedRevisionControl::new(RevisionControlKind::Git, root));
     }
 
-    darcs::get_darcs_repo_root(base_dir)
-        .map(|root| DetectedRevisionControl::new(RevisionControlKind::Darcs, root))
+    darcs::get_darcs_repo_root(base_dir).map(|root| {
+        let tooling_error = darcs::warn_missing_darcs_cli();
+        DetectedRevisionControl::new_with_tooling_error(
+            RevisionControlKind::Darcs,
+            root,
+            tooling_error,
+        )
+    })
 }
 
 pub fn resolve_revision_control_project_for_trust(
@@ -140,6 +156,7 @@ mod tests {
             detected.capabilities,
             RevisionControlCapabilities::new(true, true)
         );
+        assert!(detected.tooling_error.is_none());
     }
 
     #[test]
@@ -165,6 +182,11 @@ mod tests {
             detected.capabilities,
             RevisionControlCapabilities::new(false, false)
         );
+        if darcs::darcs_cli_available() {
+            assert!(detected.tooling_error.is_none());
+        } else {
+            assert!(detected.tooling_error.is_some());
+        }
     }
 
     #[test]

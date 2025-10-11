@@ -1,5 +1,12 @@
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+
+use tracing::warn;
+
+const DARCS_MISSING_MESSAGE: &str = "Darcs repository detected but the `darcs` CLI is not installed. Install it to enable Codex's Darcs integration.";
+
+static DARCS_WARNING_EMITTED: OnceLock<()> = OnceLock::new();
 
 /// Return the Darcs repository root if the provided directory is inside a Darcs
 /// checkout.
@@ -22,6 +29,26 @@ pub fn get_darcs_repo_root(base_dir: &Path) -> Option<PathBuf> {
     }
 
     None
+}
+
+/// Returns `true` when the `darcs` executable is available on `PATH`.
+pub fn darcs_cli_available() -> bool {
+    which::which("darcs").is_ok()
+}
+
+/// Emit a warning (only once per process) when a Darcs repository is detected but the
+/// CLI is missing. The message is also returned so callers can surface it in the UI.
+pub fn warn_missing_darcs_cli() -> Option<String> {
+    if darcs_cli_available() {
+        return None;
+    }
+
+    if DARCS_WARNING_EMITTED.set(()).is_ok() {
+        warn!("{DARCS_MISSING_MESSAGE}");
+        eprintln!("{DARCS_MISSING_MESSAGE}");
+    }
+
+    Some(DARCS_MISSING_MESSAGE.to_string())
 }
 
 #[cfg(test)]

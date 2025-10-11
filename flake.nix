@@ -24,6 +24,7 @@
           # for precommit hook
           pnpm
           husky
+          darcs
         ];
         codex-cli = import ./codex-cli {
           inherit pkgs monorepo-deps;

@@ -114,10 +114,12 @@ impl OnboardingScreen {
             steps.push(Step::TrustDirectory(TrustDirectoryWidget {
                 cwd,
                 codex_home,
-                revision_control,
+                revision_control: revision_control.clone(),
                 selection: None,
                 highlighted,
-                error: None,
+                error: revision_control
+                    .as_ref()
+                    .and_then(|rc| rc.tooling_error.clone()),
             }))
         }
         // TODO: add git warning.
