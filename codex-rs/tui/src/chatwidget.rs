@@ -42,6 +42,7 @@ use codex_core::protocol::UserMessageEvent;
 use codex_core::protocol::ViewImageToolCallEvent;
 use codex_core::protocol::WebSearchBeginEvent;
 use codex_core::protocol::WebSearchEndEvent;
+use codex_core::revision_control::RevisionControlKind;
 use codex_core::revision_control::detect_revision_control;
 use codex_protocol::ConversationId;
 use codex_protocol::parse_command::ParsedCommand;
@@ -108,13 +109,13 @@ use codex_core::protocol::SandboxPolicy;
 use codex_core::protocol_config_types::ReasoningEffort as ReasoningEffortConfig;
 use codex_file_search::FileMatch;
 use codex_git_tooling::CreateGhostCommitOptions;
-use codex_git_tooling::GhostCommit;
-use codex_git_tooling::GitToolingError;
 use codex_git_tooling::RepoSnapshotManager;
+use codex_git_tooling::Snapshot;
+use codex_git_tooling::SnapshotError;
 use codex_protocol::plan_tool::UpdatePlanArgs;
 use strum::IntoEnumIterator;
 
-const MAX_TRACKED_GHOST_COMMITS: usize = 20;
+const MAX_TRACKED_SNAPSHOTS: usize = 20;
 
 // Track information about an in-flight exec command.
 struct RunningCommand {
@@ -253,9 +254,9 @@ pub(crate) struct ChatWidget {
     pending_notification: Option<Notification>,
     // Simple review mode flag; used to adjust layout and banners.
     is_review_mode: bool,
-    // List of ghost commits corresponding to each turn.
-    ghost_snapshots: Vec<GhostCommit>,
-    ghost_snapshots_disabled: bool,
+    // List of repository snapshots corresponding to each turn.
+    repo_snapshots: Vec<Snapshot>,
+    snapshots_disabled: bool,
     // Whether to add a final message separator after the last message
     needs_final_message_separator: bool,
 
@@ -934,8 +935,8 @@ impl ChatWidget {
             suppress_session_configured_redraw: false,
             pending_notification: None,
             is_review_mode: false,
-            ghost_snapshots: Vec::new(),
-            ghost_snapshots_disabled: true,
+            repo_snapshots: Vec::new(),
+            snapshots_disabled: true,
             needs_final_message_separator: false,
             last_rendered_width: std::cell::Cell::new(None),
         }
@@ -997,8 +998,8 @@ impl ChatWidget {
             suppress_session_configured_redraw: true,
             pending_notification: None,
             is_review_mode: false,
-            ghost_snapshots: Vec::new(),
-            ghost_snapshots_disabled: true,
+            repo_snapshots: Vec::new(),
+            snapshots_disabled: true,
             needs_final_message_separator: false,
             last_rendered_width: std::cell::Cell::new(None),
         }
@@ -1140,23 +1141,28 @@ impl ChatWidget {
                 self.add_diff_in_progress();
                 let tx = self.app_event_tx.clone();
                 tokio::spawn(async move {
-                    let text = match get_repo_diff().await {
+                    let (kind, text) = match get_repo_diff().await {
                         Ok((Some(kind), diff_text)) => {
                             if diff_text.trim().is_empty() {
-                                format!(
-                                    "`/diff` — _no pending changes in {} repository_",
-                                    kind.display_name().to_lowercase()
+                                (
+                                    Some(kind),
+                                    format!(
+                                        "`/diff` — _no pending changes in {} repository_",
+                                        kind.display_name().to_lowercase()
+                                    ),
                                 )
                             } else {
-                                diff_text
+                                (Some(kind), diff_text)
                             }
                         }
-                        Ok((None, _)) => {
-                            "`/diff` — _not inside a Git or Darcs repository_".to_string()
-                        }
-                        Err(e) => format!("Failed to compute diff: {e}"),
+                        Ok((None, _)) => (
+                            None,
+                            "`/diff` — _not inside a supported revision control repository_"
+                                .to_string(),
+                        ),
+                        Err(e) => (None, format!("Failed to compute diff: {e}")),
                     };
-                    tx.send(AppEvent::DiffResult(text));
+                    tx.send(AppEvent::DiffResult { kind, text });
                 });
             }
             SlashCommand::Mention => {
@@ -1257,7 +1263,7 @@ impl ChatWidget {
             return;
         }
 
-        self.capture_ghost_snapshot();
+        self.capture_repo_snapshot();
 
         let mut items: Vec<InputItem> = Vec::new();
 
@@ -1291,43 +1297,56 @@ impl ChatWidget {
         self.needs_final_message_separator = false;
     }
 
-    fn capture_ghost_snapshot(&mut self) {
-        if self.ghost_snapshots_disabled {
+    fn capture_repo_snapshot(&mut self) {
+        if self.snapshots_disabled {
             return;
         }
 
         let options = CreateGhostCommitOptions::new(&self.config.cwd);
+        let storage_root = self.config.codex_home.join("tmp").join("snapshots");
         let result = if let Some(revision_control) = detect_revision_control(&self.config.cwd) {
-            RepoSnapshotManager::new(&revision_control).create_snapshot(&options)
+            RepoSnapshotManager::new(&revision_control)
+                .with_storage_root(storage_root)
+                .create_snapshot(&options)
         } else {
-            Err(GitToolingError::NotAGitRepository {
+            Err(SnapshotError::NotARepository {
                 path: self.config.cwd.clone(),
             })
         };
 
         match result {
-            Ok(commit) => {
-                self.ghost_snapshots.push(commit);
-                if self.ghost_snapshots.len() > MAX_TRACKED_GHOST_COMMITS {
-                    self.ghost_snapshots.remove(0);
+            Ok(snapshot) => {
+                self.repo_snapshots.push(snapshot);
+                if self.repo_snapshots.len() > MAX_TRACKED_SNAPSHOTS {
+                    self.repo_snapshots.remove(0);
                 }
             }
             Err(err) => {
-                self.ghost_snapshots_disabled = true;
+                self.snapshots_disabled = true;
                 let (message, hint) = match &err {
-                    GitToolingError::NotAGitRepository { .. } => (
-                        "Snapshots disabled: current directory is not a Git repository."
+                    SnapshotError::NotARepository { .. } => (
+                        "Snapshots disabled: current directory is not a revision control repository."
                             .to_string(),
                         None,
                     ),
-                    GitToolingError::UnsupportedRevisionControl { kind } => (
+                    SnapshotError::UnsupportedRevisionControl { kind } => (
                         format!(
                             "Snapshots disabled: {} repositories are not supported.",
                             kind.display_name()
                         ),
                         Some(
-                            "Switch to a Git repository and restart Codex to re-enable snapshots."
+                            "Switch to a supported repository type and restart Codex to re-enable snapshots."
                                 .to_string(),
+                        ),
+                    ),
+                    SnapshotError::MissingTool { tool } => (
+                        format!(
+                            "Snapshots disabled: the {tool} CLI is not installed.",
+                        ),
+                        Some(
+                            format!(
+                                "Install {tool} and restart Codex to re-enable snapshots."
+                            ),
                         ),
                     ),
                     _ => (
@@ -1339,33 +1358,38 @@ impl ChatWidget {
                     ),
                 };
                 self.add_info_message(message, hint);
-                tracing::warn!("failed to create ghost snapshot: {err}");
+                tracing::warn!("failed to create repository snapshot: {err}");
             }
         }
     }
 
     fn undo_last_snapshot(&mut self) {
-        let Some(commit) = self.ghost_snapshots.pop() else {
+        let Some(snapshot) = self.repo_snapshots.pop() else {
             self.add_info_message("No snapshot available to undo.".to_string(), None);
             return;
         };
 
+        let storage_root = self.config.codex_home.join("tmp").join("snapshots");
         let result = if let Some(revision_control) = detect_revision_control(&self.config.cwd) {
-            RepoSnapshotManager::new(&revision_control).restore_snapshot(&self.config.cwd, &commit)
+            RepoSnapshotManager::new(&revision_control)
+                .with_storage_root(storage_root)
+                .restore_snapshot(&self.config.cwd, &snapshot)
         } else {
-            Err(GitToolingError::NotAGitRepository {
+            Err(SnapshotError::NotARepository {
                 path: self.config.cwd.clone(),
             })
         };
 
         if let Err(err) = result {
             self.add_error_message(format!("Failed to restore snapshot: {err}"));
-            self.ghost_snapshots.push(commit);
+            self.repo_snapshots.push(snapshot);
             return;
         }
 
-        let short_id: String = commit.id().chars().take(8).collect();
-        self.add_info_message(format!("Restored workspace to snapshot {short_id}"), None);
+        self.add_info_message(
+            format!("Restored workspace to snapshot {}", snapshot.short_id()),
+            None,
+        );
     }
 
     /// Replay a subset of initial events into the UI to seed the transcript when
@@ -1954,48 +1978,89 @@ impl ChatWidget {
 
     pub(crate) fn open_review_popup(&mut self) {
         let mut items: Vec<SelectionItem> = Vec::new();
+        let revision_control = detect_revision_control(&self.config.cwd);
+        let revision_kind = revision_control.as_ref().map(|rc| rc.kind);
+
+        if matches!(revision_kind, Some(RevisionControlKind::Git)) {
+            items.push(SelectionItem {
+                name: "Review against a base branch".to_string(),
+                description: Some("(PR Style)".into()),
+                actions: vec![Box::new({
+                    let cwd = self.config.cwd.clone();
+                    move |tx| {
+                        tx.send(AppEvent::OpenReviewBranchPicker(cwd.clone()));
+                    }
+                })],
+                dismiss_on_select: false,
+                ..Default::default()
+            });
+        }
+
+        if matches!(revision_kind, Some(RevisionControlKind::Darcs)) {
+            items.push(SelectionItem {
+                name: "Review pending patches".to_string(),
+                description: Some("(Darcs)".into()),
+                actions: vec![Box::new({
+                    let prompt = "Review the pending Darcs patches for this repository. Use `darcs changes --pending --summary` to list patch names and `darcs whatsnew --unified --look-for-adds` to inspect their contents. Provide prioritized, actionable findings.".to_string();
+                    let hint = "pending Darcs patches".to_string();
+                    move |tx: &AppEventSender| {
+                        tx.send(AppEvent::CodexOp(Op::Review {
+                            review_request: ReviewRequest {
+                                prompt: prompt.clone(),
+                                user_facing_hint: hint.clone(),
+                            },
+                        }));
+                    }
+                })],
+                dismiss_on_select: true,
+                ..Default::default()
+            });
+        }
+
+        let workspace_item_name = match revision_kind {
+            Some(RevisionControlKind::Darcs) => "Review workspace changes".to_string(),
+            _ => "Review uncommitted changes".to_string(),
+        };
+        let workspace_prompt = match revision_kind {
+            Some(RevisionControlKind::Darcs) => "Review the current workspace changes (including pending patches and unrecorded files) and provide prioritized findings.".to_string(),
+            _ => "Review the current code changes (staged, unstaged, and untracked files) and provide prioritized findings.".to_string(),
+        };
+        let workspace_hint = match revision_kind {
+            Some(RevisionControlKind::Darcs) => "workspace changes".to_string(),
+            _ => "current changes".to_string(),
+        };
 
         items.push(SelectionItem {
-            name: "Review against a base branch".to_string(),
-            description: Some("(PR Style)".into()),
+            name: workspace_item_name,
             actions: vec![Box::new({
-                let cwd = self.config.cwd.clone();
-                move |tx| {
-                    tx.send(AppEvent::OpenReviewBranchPicker(cwd.clone()));
-                }
-            })],
-            dismiss_on_select: false,
-            ..Default::default()
-        });
-
-        items.push(SelectionItem {
-            name: "Review uncommitted changes".to_string(),
-            actions: vec![Box::new(
+                let prompt = workspace_prompt;
+                let hint = workspace_hint;
                 move |tx: &AppEventSender| {
                     tx.send(AppEvent::CodexOp(Op::Review {
                         review_request: ReviewRequest {
-                            prompt: "Review the current code changes (staged, unstaged, and untracked files) and provide prioritized findings.".to_string(),
-                            user_facing_hint: "current changes".to_string(),
+                            prompt: prompt.clone(),
+                            user_facing_hint: hint.clone(),
                         },
                     }));
-                },
-            )],
+                }
+            })],
             dismiss_on_select: true,
             ..Default::default()
         });
 
-        // New: Review a specific commit (opens commit picker)
-        items.push(SelectionItem {
-            name: "Review a commit".to_string(),
-            actions: vec![Box::new({
-                let cwd = self.config.cwd.clone();
-                move |tx| {
-                    tx.send(AppEvent::OpenReviewCommitPicker(cwd.clone()));
-                }
-            })],
-            dismiss_on_select: false,
-            ..Default::default()
-        });
+        if matches!(revision_kind, Some(RevisionControlKind::Git)) {
+            items.push(SelectionItem {
+                name: "Review a commit".to_string(),
+                actions: vec![Box::new({
+                    let cwd = self.config.cwd.clone();
+                    move |tx| {
+                        tx.send(AppEvent::OpenReviewCommitPicker(cwd.clone()));
+                    }
+                })],
+                dismiss_on_select: false,
+                ..Default::default()
+            });
+        }
 
         items.push(SelectionItem {
             name: "Custom review instructions".to_string(),
@@ -2015,6 +2080,17 @@ impl ChatWidget {
     }
 
     pub(crate) async fn show_review_branch_picker(&mut self, cwd: &Path) {
+        if !matches!(
+            detect_revision_control(cwd).as_ref().map(|rc| rc.kind),
+            Some(RevisionControlKind::Git)
+        ) {
+            self.add_error_message(
+                "Reviewing against a base branch is only available in Git repositories."
+                    .to_string(),
+            );
+            return;
+        }
+
         let branches = local_git_branches(cwd).await;
         let current_branch = current_branch_name(cwd)
             .await
@@ -2052,6 +2128,16 @@ impl ChatWidget {
     }
 
     pub(crate) async fn show_review_commit_picker(&mut self, cwd: &Path) {
+        if !matches!(
+            detect_revision_control(cwd).as_ref().map(|rc| rc.kind),
+            Some(RevisionControlKind::Git)
+        ) {
+            self.add_error_message(
+                "Commit reviews are only available in Git repositories.".to_string(),
+            );
+            return;
+        }
+
         let commits = codex_core::git_info::recent_commits(cwd, 100).await;
 
         let mut items: Vec<SelectionItem> = Vec::with_capacity(commits.len());

@@ -11,6 +11,7 @@ use crate::history_cell::HistoryCell;
 use codex_core::protocol::AskForApproval;
 use codex_core::protocol::SandboxPolicy;
 use codex_core::protocol_config_types::ReasoningEffort;
+use codex_core::revision_control::RevisionControlKind;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
@@ -41,7 +42,10 @@ pub(crate) enum AppEvent {
     },
 
     /// Result of computing a `/diff` command.
-    DiffResult(String),
+    DiffResult {
+        kind: Option<RevisionControlKind>,
+        text: String,
+    },
 
     InsertHistoryCell(Box<dyn HistoryCell>),
 

@@ -107,7 +107,7 @@ impl OnboardingScreen {
         let highlighted = if revision_control.is_some() {
             TrustDirectorySelection::Trust
         } else {
-            // Default to not trusting the directory if it's not a git repo.
+            // Default to not trusting the directory if it's not revision controlled.
             TrustDirectorySelection::DontTrust
         };
         if show_trust_screen {
