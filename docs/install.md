@@ -10,7 +10,9 @@
 | RAM                         | 4-GB minimum (8-GB recommended)                                 |
 
 Codex shells out to the `darcs` executable whenever it detects a Darcs repository, so install the CLI before
-launching Codex in those workspaces.
+launching Codex in those workspaces. A quick smoke test such as `darcs --version` verifies that the binary is
+available on `PATH`; without it Codex will surface a warning and fall back to read-only metadata when you open a
+Darcs checkout.
 
 ### DotSlash
 

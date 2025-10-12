@@ -217,6 +217,29 @@ model_provider = "openai"
 approval_policy = "on-failure"
 ```
 
+### Darcs-focused defaults
+
+Codex auto-detects whether the current workspace uses Git or Darcs, but you can still tailor other defaults for Darcs-heavy
+projects. The snippet below pins the default profile to `darcs`, adds onboarding instructions that remind contributors to name
+patches, and enables plan tooling so the agent can stage multi-step refactors before recording a patch:
+
+```toml
+profile = "darcs"
+
+[profiles.darcs]
+model = "gpt-5-codex"
+approval_policy = "on-request"
+experimental_instructions_file = "~/.config/codex/darcs_instructions.md"
+
+[tools]
+view_image = true
+```
+
+Pair this with an `AGENTS.md` in your repository to document patch naming conventions or other Darcs-specific guidance; Codex
+will merge those instructions with the profile defaults whenever it sees an `_darcs` checkout. If you prefer to keep the plan
+tool or other experimental features enabled only for Darcs work, add the corresponding CLI flags (`--include-plan-tool`, etc.)
+when launching Codex or bake them into shell aliases alongside the profile selection.
+
 Users can specify config values at multiple levels. Order of precedence is as follows:
 
 1. custom command-line argument, e.g., `--model o3`

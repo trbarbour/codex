@@ -22,6 +22,8 @@ integration point to the implementation so the behavior can be replicated elsewh
   tasks/src/env_detect.rs†L1-L250】
 * When Codex is pointed at a directory without a supported backend, higher-level features such as ghost snapshots are disabled
   and the UI emits an informational message explaining why, preventing repeated failures.【F:codex-rs/tui/src/chatwidget.rs†L1255-L1342】
+* Release automation exposes a `--backend` flag so operators can force either the Git or Darcs workflow regardless of what is on
+  disk; use `--backend darcs` when tagging and pushing via the Darcs CLI from a mixed repository checkout.【F:codex-rs/scripts/create_github_release†L1-L120】
 
 ## Collecting repository metadata
 
@@ -145,6 +147,18 @@ instead of Git branches.
 
 The detailed Darcs backlog has moved to [docs/queues/darcs.md](./queues/darcs.md). That file preserves the numbered
 `:::task-stub` entries for contributors who want to continue the implementation work.
+
+## Migration guidance
+
+- **Pilot in a branch.** Convert a throwaway Git branch to Darcs using `darcs convert import --repo` and exercise Codex there
+  first. Codex will continue to warn if the `darcs` executable is missing, so this dry run is a safe way to confirm shell tools
+  and onboarding copy behave as expected before migrating production workflows.【F:codex-rs/core/src/revision_control/darcs.rs†L14-L120】【F:codex-rs/tui/src/onboarding/onboarding_screen.rs†L86-L134】
+- **Mirror remotes.** Keep both Git and Darcs remotes configured during the transition. Codex’s environment detection merges the
+  two sets of remotes so background automation (rollouts, release tagging) continues to work while teams gradually move patch
+  review over to Darcs.【F:codex-rs/cloud-tasks/src/env_detect.rs†L1-L250】【F:codex-rs/core/src/rollout/recorder.rs†L28-L368】
+- **Document conventions.** Store patch naming rules or repository-specific workflows in `AGENTS.md` alongside a Darcs-focused
+  config profile so every session inherits the new guidance. The onboarding widget surfaces those notes immediately after it
+  detects `_darcs`, reducing friction for mixed teams.【F:codex/codex-rs/common/src/config_summary.rs†L17-L33】【F:codex-rs/tui/src/onboarding/trust_directory.rs†L28-L190】
 
 ## Testing strategy
 - **Unit tests:** Exercise Git and Darcs implementations of the revision-control trait, diff helpers, and snapshot managers with

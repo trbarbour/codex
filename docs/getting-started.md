@@ -2,6 +2,8 @@
 
 > **Note:** Codex shells out to the `darcs` CLI when you open a Darcs repository. Install `darcs`
 > via your package manager first; Codex will warn you at startup if the executable is missing.
+> When `_darcs` is present Codex adjusts `/diff`, undo snapshots, and the review call-to-actions to
+> operate on Darcs patches rather than Git commits so the workflows feel native.
 
 ### CLI usage
 
@@ -12,6 +14,15 @@
 | `codex exec "..."` | Non-interactive "automation mode"  | `codex exec "explain utils.ts"` |
 
 Key flags: `--model/-m`, `--ask-for-approval/-a`.
+
+#### Working in Git vs Darcs repositories
+
+- Codex auto-detects `.git` and `_darcs` roots. The status header and `/diff` output call out the detected backend so you can
+  confirm the right tooling is in play.
+- Darcs workspaces reuse the same keyboard shortcuts but the primary action changes to "Record Darcs patch", `/diff` shells out
+  to `darcs whatsnew`, and undo snapshots are backed by temporary Darcs bundles.
+- If the `darcs` CLI is missing, Codex will surface a banner in the onboarding screen explaining which features are temporarily
+  disabled until the executable is installed.
 
 ### Resuming interactive sessions
 
