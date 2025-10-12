@@ -17,7 +17,9 @@ integration point to the implementation so the behavior can be replicated elsewh
   the executable is missing, and records the message so onboarding and config summaries can surface actionable
   guidance.【F:codex-rs/core/src/revision_control/darcs.rs†L1-L209】【F:codex-rs/common/src/config_summary.rs†L1-L40】【F:codex-rs/tui/src/onboarding/onboarding_screen.rs†L86-L134】
 * Environment detection merges Git remotes with Darcs repository preferences by parsing `_darcs/prefs/repos`, allowing cloud
-  flows to match the active workspace regardless of backend.【F:codex-rs/cloud-tasks/src/env_detect.rs†L1-L250】
+  flows to match the active workspace regardless of backend. The regression tests in `cargo test -p codex-cloud-tasks`
+  cover the env filter permutations so the mixed-backend detection keeps compiling as the workflow evolves.【F:codex-rs/cloud-
+  tasks/src/env_detect.rs†L1-L250】
 * When Codex is pointed at a directory without a supported backend, higher-level features such as ghost snapshots are disabled
   and the UI emits an informational message explaining why, preventing repeated failures.【F:codex-rs/tui/src/chatwidget.rs†L1255-L1342】
 
