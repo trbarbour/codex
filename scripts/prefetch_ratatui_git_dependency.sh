@@ -29,4 +29,4 @@ if [[ ! -f "${manifest}" ]]; then
 fi
 
 echo "Prefetching ratatui git dependency via cargo fetch"
-cargo fetch --locked --manifest-path "${manifest}" -p codex-tui
+cargo fetch --locked --manifest-path "${manifest}"
