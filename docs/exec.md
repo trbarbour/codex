@@ -83,7 +83,7 @@ Combine `--output-schema` with `-o` to only print the final JSON output. You can
 
 ### Revision control requirement
 
-Codex requires a Git or Darcs repository to avoid destructive changes. To disable this check when operating outside a supported checkout, use `codex exec --skip-git-repo-check`.
+Codex requires a Git or Darcs repository to avoid destructive changes. Detection is automatic—Codex walks up from the working directory until it finds either a `.git` directory or an `_darcs` folder and tailors the session UI, diff helpers, and snapshotting workflow accordingly. When `_darcs` is detected, Codex invokes the `darcs` CLI for metadata and diffs; if the binary is missing you will see a warning banner and the run proceeds in a reduced "read-only" mode. To disable the repository check altogether when operating outside a supported checkout, use `codex exec --skip-git-repo-check`.
 
 ### Resuming non-interactive sessions
 
