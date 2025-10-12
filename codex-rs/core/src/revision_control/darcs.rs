@@ -91,26 +91,99 @@ pub async fn workspace_diff(cwd: &Path) -> io::Result<String> {
         return Ok(String::new());
     }
 
-    let output = timeout(
-        DARCS_COMMAND_TIMEOUT,
-        Command::new("darcs")
-            .args(["whatsnew", "--unified", "--color=always", "--look-for-adds"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .current_dir(cwd)
-            .output(),
-    )
-    .await
-    .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "darcs whatsnew timed out"))??;
-
-    if output.status.success() || output.status.code() == Some(1) {
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        Err(io::Error::other(format!(
-            "darcs whatsnew failed with status {}",
-            output.status
-        )))
+    if let Some(diff) = run_workspace_diff(cwd, true).await? {
+        return Ok(diff);
     }
+
+    if let Some(diff) = run_workspace_diff(cwd, false).await? {
+        return Ok(diff);
+    }
+
+    Err(io::Error::other("darcs whatsnew failed to produce output"))
+}
+
+async fn run_workspace_diff(cwd: &Path, use_color: bool) -> io::Result<Option<String>> {
+    let mut command = Command::new("darcs");
+    command
+        .args(["whatsnew", "--unified", "--look-for-adds", "--no-summary"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .current_dir(cwd);
+
+    if use_color {
+        command.arg("--color=always");
+    }
+
+    let output = timeout(DARCS_COMMAND_TIMEOUT, command.output())
+        .await
+        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "darcs whatsnew timed out"))??;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let stderr_trimmed = stderr.trim();
+    let has_untracked_warning = contains_untracked_warning(stderr_trimmed);
+
+    if output.status.success() {
+        let diff = if has_untracked_warning && !stderr_trimmed.is_empty() {
+            append_untracked_warning(stdout, stderr_trimmed)
+        } else {
+            stdout
+        };
+
+        return Ok(Some(diff));
+    }
+
+    if output.status.code() == Some(1) && (stderr_trimmed.is_empty() || has_untracked_warning) {
+        let mut diff = if stdout.trim() == "No changes!" {
+            String::new()
+        } else {
+            stdout
+        };
+
+        if has_untracked_warning && !stderr_trimmed.is_empty() {
+            diff = append_untracked_warning(diff, stderr_trimmed);
+        }
+
+        return Ok(Some(diff));
+    }
+
+    if use_color {
+        return Ok(None);
+    }
+
+    Err(io::Error::other(format!(
+        "darcs whatsnew failed with status {}: {}",
+        output.status,
+        stderr.trim()
+    )))
+}
+
+fn contains_untracked_warning(stderr: &str) -> bool {
+    if stderr.is_empty() {
+        return false;
+    }
+
+    let lowered = stderr.to_ascii_lowercase();
+    lowered.contains("not added")
+        || lowered.contains("not recorded")
+        || lowered.contains("not in the repository")
+}
+
+fn append_untracked_warning(mut diff: String, warning: &str) -> String {
+    if diff.is_empty() {
+        diff.push_str(warning);
+        diff.push('\n');
+        return diff;
+    }
+
+    if !diff.ends_with('\n') {
+        diff.push('\n');
+    }
+
+    diff.push('\n');
+    diff.push_str(warning);
+    diff.push('\n');
+    diff
 }
 
 async fn latest_patch_hash(cwd: &Path) -> Option<String> {

@@ -6,9 +6,9 @@ if command -v darcs >/dev/null 2>&1; then
   exit 0
 fi
 
-if [ "${EUID}" -ne 0 ]; then
+if [[ "${EUID}" -ne 0 ]]; then
   echo "Re-running with sudo to install darcs via apt." >&2
-  exec sudo "$0" "$@"
+  exec sudo -E "$0" "$@"
 fi
 
 export DEBIAN_FRONTEND=noninteractive
@@ -121,7 +121,7 @@ if ! apt-get install "${APT_ARGS[@]}" -y --no-install-recommends darcs; then
   echo "Falling back to installing darcs from the Ubuntu archive" >&2
   archive_url="${primary_mirror%/}/pool/universe/d/darcs/"
   deb_name="$(
-    python3 - "$archive_url" "${arch}" <<'PY'
+    python3 - "${archive_url}" "${arch}" <<'PY'
 import re
 import sys
 import urllib.request
