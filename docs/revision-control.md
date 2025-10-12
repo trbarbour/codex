@@ -167,6 +167,8 @@ The detailed Darcs backlog has moved to [docs/queues/darcs.md](./queues/darcs.md
   snapshots, and rollout metadata behave identically.
 - **Sandbox tests:** Re-run seatbelt permission tests for both `.git` and `_darcs` roots to guarantee safe defaults.
 - **Release tests:** Add dry-run tests for Git and Darcs release scripts to ensure the correct tool is invoked in each context.
+- **CI fallback:** The GitHub Actions matrix attempts to install the `darcs` CLI on every platform and falls back to skipping
+  Darcs-only tests when the executable is unavailable (for example on Windows ARM runners).【F:.github/workflows/rust-ci.yml†L147-L186】【F:.github/workflows/rust-release.yml†L81-L120】
 - **Manual verification:** Validate Darcs-specific features (interactive patch selection, remote pull previews) in a sample
   repo to confirm UX parity.
 

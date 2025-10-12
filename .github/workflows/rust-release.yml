@@ -92,16 +92,32 @@ jobs:
         run: |
           if (Get-Command darcs -ErrorAction SilentlyContinue) {
             Write-Host 'darcs already installed'
-          } else {
-            choco install -y darcs --no-progress
-            if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) {
-              Write-Host "Chocolatey install failed (exit $LASTEXITCODE), attempting winget..."
-              winget install --id Darcs.Darcs -e --accept-package-agreements --accept-source-agreements
-              if ($LASTEXITCODE -ne 0) {
-                throw 'Failed to install darcs via Chocolatey or winget.'
-              }
-            }
+            exit 0
           }
+
+          $installAttempts = @()
+
+          if (Get-Command choco -ErrorAction SilentlyContinue) {
+            $installAttempts += @{ Name = 'Chocolatey'; Command = { choco install -y darcs --no-progress } }
+          }
+
+          if (Get-Command winget -ErrorAction SilentlyContinue) {
+            $installAttempts += @{ Name = 'winget'; Command = { winget install --id Darcs.Darcs -e --accept-package-agreements --accept-source-agreements } }
+          }
+
+          foreach ($attempt in $installAttempts) {
+            Write-Host "Attempting to install darcs via $($attempt.Name)..."
+            & $attempt.Command
+            if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 3010) {
+              Write-Host "darcs installed via $($attempt.Name)."
+              exit 0
+            }
+
+            Write-Warning "darcs installation via $($attempt.Name) failed with exit code $LASTEXITCODE."
+          }
+
+          Write-Warning 'darcs could not be installed automatically on this runner. Darcs-specific release steps will skip when the CLI is unavailable.'
+          exit 0
       - uses: dtolnay/rust-toolchain@1.90
         with:
           targets: ${{ matrix.target }}
