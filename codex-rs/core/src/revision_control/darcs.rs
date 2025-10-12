@@ -120,17 +120,31 @@ async fn run_workspace_diff(cwd: &Path, use_color: bool) -> io::Result<Option<St
 
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let stderr_trimmed = stderr.trim();
+    let has_untracked_warning = contains_untracked_warning(stderr_trimmed);
 
     if output.status.success() {
-        return Ok(Some(stdout));
+        let diff = if has_untracked_warning && !stderr_trimmed.is_empty() {
+            append_untracked_warning(stdout, stderr_trimmed)
+        } else {
+            stdout
+        };
+
+        return Ok(Some(diff));
     }
 
-    if output.status.code() == Some(1) && stderr.trim().is_empty() {
-        if stdout.trim() == "No changes!" {
-            return Ok(Some(String::new()));
+    if output.status.code() == Some(1) && (stderr_trimmed.is_empty() || has_untracked_warning) {
+        let mut diff = if stdout.trim() == "No changes!" {
+            String::new()
+        } else {
+            stdout
+        };
+
+        if has_untracked_warning && !stderr_trimmed.is_empty() {
+            diff = append_untracked_warning(diff, stderr_trimmed);
         }
 
-        return Ok(Some(stdout));
+        return Ok(Some(diff));
     }
 
     if use_color {
@@ -142,6 +156,34 @@ async fn run_workspace_diff(cwd: &Path, use_color: bool) -> io::Result<Option<St
         output.status,
         stderr.trim()
     )))
+}
+
+fn contains_untracked_warning(stderr: &str) -> bool {
+    if stderr.is_empty() {
+        return false;
+    }
+
+    let lowered = stderr.to_ascii_lowercase();
+    lowered.contains("not added")
+        || lowered.contains("not recorded")
+        || lowered.contains("not in the repository")
+}
+
+fn append_untracked_warning(mut diff: String, warning: &str) -> String {
+    if diff.is_empty() {
+        diff.push_str(warning);
+        diff.push('\n');
+        return diff;
+    }
+
+    if !diff.ends_with('\n') {
+        diff.push('\n');
+    }
+
+    diff.push('\n');
+    diff.push_str(warning);
+    diff.push('\n');
+    diff
 }
 
 async fn latest_patch_hash(cwd: &Path) -> Option<String> {
