@@ -220,8 +220,9 @@ approval_policy = "on-failure"
 ### Darcs-focused defaults
 
 Codex auto-detects whether the current workspace uses Git or Darcs, but you can still tailor other defaults for Darcs-heavy
-projects. The snippet below pins the default profile to `darcs`, adds onboarding instructions that remind contributors to name
-patches, and enables plan tooling so the agent can stage multi-step refactors before recording a patch:
+projects. Add the following to your `$CODEX_HOME/config.toml` (typically `~/.codex/config.toml`) to pin the default profile to
+`darcs`, add onboarding instructions that remind contributors to name patches, and enable plan tooling so the agent can stage
+multi-step refactors before recording a patch:
 
 ```toml
 profile = "darcs"
