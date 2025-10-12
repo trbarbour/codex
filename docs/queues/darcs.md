@@ -24,7 +24,7 @@ logic can slot in next to the existing Git implementation.【F:codex-rs/core/src
 | 5. Update UI/UX text and workflows for multiple revision-control backends | ✅ Completed | The TUI now tailors `/diff` labels, review presets, and onboarding copy based on the detected backend, including Darcs-specific prompts and diff headings.【F:codex-rs/tui/src/chatwidget.rs†L1120-L1220】【F:codex-rs/tui/src/app.rs†L280-L320】【F:codex-rs/tui/src/onboarding/onboarding_screen.rs†L90-L140】 |
 | 6. Extend sandbox and trust policies to recognise Darcs repositories | ✅ Completed | Seatbelt now treats `_darcs` directories as read-only when the repo root is writable, mirroring `.git`, and tests cover Darcs metadata protection. 【F:codex-rs/protocol/src/protocol.rs†L327-L388】【F:codex-rs/core/tests/suite/seatbelt.rs†L16-L239】 |
 | 7. Integrate Darcs with environment detection and release tooling | ✅ Completed | Environment auto-detection now inspects Darcs repo preferences alongside Git remotes, and the release helper exposes a Darcs workflow gated by a new `--backend` flag.【F:codex-rs/cloud-tasks/src/env_detect.rs†L1-L292】【F:codex-rs/scripts/create_github_release†L1-L286】 |
-| 8–9. Remaining roadmap items | ⏳ Not started | No code paths or docs reference Darcs onboarding text, sandbox integration, environment detection, docs updates, or CI coverage yet. |
+| 8–9. Remaining roadmap items | ⏳ In progress | Revision-control documentation now covers the Darcs review flow; onboarding text, config guidance, and CI coverage still need updates. |
 
 ### 1. Abstract repository/revision detection
 Introduce a `RevisionControlSystem` trait that reports repository type, root, and capabilities. Update config loading, CLI

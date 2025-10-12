@@ -106,6 +106,30 @@ maintains the work queue for tracking.
   users preview and apply pending remote patches directly from Codex, optionally displaying patch metadata (authors,
   dependencies) to support more granular reviews.
 
+### Darcs review and publishing workflow
+
+Darcs users follow the same high-level loop as Git users—stage their work, request a review, and publish once it is
+approved—but the UI flows differ to respect Darcs’ patch-based model:
+
+1. **Finish work ➜ “Record patch” call-to-action.** When Codex detects a Darcs checkout the TUI replaces the "Create PR"
+   button with "Record Darcs patch". Selecting the action opens a modal that asks for the patch name and optional
+   long-form description; Codex runs `darcs record --select-changes` under the hood so contributors can confirm the
+   exact hunks that should ship.
+2. **Inline review stays inline.** After the patch is recorded Codex pushes the resulting bundle to the configured review
+   queue (either a Darcs remote or the Codex cloud service) and renders a patch review screen identical to the PR
+   reviewer. Comment threads remain anchored to file/line ranges inside the Darcs diff so reviewers can annotate the
+   change without switching tools.
+3. **Review bot parity.** The Codex review bot triggers off the same "review requested" event regardless of backend. When a
+   Darcs patch enters review the bot downloads the bundle, applies it in a scratch repository, and posts diagnostics back
+   to the patch discussion so users who have opted into automated reviews still receive lint/test feedback.
+4. **Publishing.** Once human (or automated) reviewers approve the patch, the modal offers "Push Darcs patch". Codex runs
+   `darcs push --all` to send the recorded patch to the default remote, mirroring Git’s "Merge PR" experience. Users who
+   need additional manual review can skip the push step and export the bundle for out-of-band processes.
+
+The result is feature parity with the Git flow: contributors still have a single button to begin review, inline comments
+continue to work, and automated review hooks remain available even though the backend stores changes as Darcs patches
+instead of Git branches.
+
 ## Implementation roadmap & work queue
 
 The detailed Darcs backlog has moved to [docs/queues/darcs.md](./queues/darcs.md). That file preserves the numbered
