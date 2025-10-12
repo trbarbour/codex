@@ -157,6 +157,8 @@ mod tests {
     use codex_core::revision_control::DetectedRevisionControl;
     use codex_core::revision_control::RevisionControlCapabilities;
     use codex_core::revision_control::RevisionControlKind;
+    use codex_core::revision_control::darcs::darcs_cli_available;
+    use pretty_assertions::assert_eq;
     use std::path::Path;
     use std::process::Command;
     use tempfile::tempdir;
@@ -167,6 +169,40 @@ mod tests {
             root: root.to_path_buf(),
             capabilities: RevisionControlCapabilities::new(true, true),
             tooling_error: None,
+        }
+    }
+
+    fn darcs_backend(root: &Path) -> DetectedRevisionControl {
+        DetectedRevisionControl::new(RevisionControlKind::Darcs, root.to_path_buf())
+    }
+
+    fn run_darcs<I, S>(repo_root: &Path, args: I)
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        use std::ffi::OsString;
+
+        let args_vec: Vec<OsString> = args
+            .into_iter()
+            .map(|arg| arg.as_ref().to_os_string())
+            .collect();
+        let output = Command::new("darcs")
+            .args(&args_vec)
+            .current_dir(repo_root)
+            .output()
+            .expect("failed to run darcs");
+
+        if !output.status.success() {
+            panic!(
+                "darcs {} failed: {}",
+                args_vec
+                    .iter()
+                    .map(|arg| arg.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
     }
 
@@ -238,6 +274,54 @@ mod tests {
 
         let restored = std::fs::read_to_string(repo.join("test.txt")).unwrap();
         assert_eq!(restored, "modified");
+        Ok(())
+    }
+
+    #[test]
+    fn darcs_snapshots_round_trip() -> Result<(), SnapshotError> {
+        if !darcs_cli_available() {
+            eprintln!("skipping Darcs snapshot test because darcs is not available");
+            return Ok(());
+        }
+
+        let temp_dir = tempdir().unwrap();
+        let repo = temp_dir.path();
+
+        run_darcs(repo, ["init"]);
+        std::fs::write(repo.join("tracked.txt"), "first version\n").unwrap();
+        run_darcs(repo, ["add", "tracked.txt"]);
+        run_darcs(
+            repo,
+            [
+                "record",
+                "-a",
+                "--look-for-adds",
+                "--author=Codex Tests <codex@example.com>",
+                "-m",
+                "Initial patch",
+            ],
+        );
+
+        std::fs::write(repo.join("tracked.txt"), "edited contents\n").unwrap();
+        std::fs::write(repo.join("notes.txt"), "temporary notes\n").unwrap();
+
+        let backend = darcs_backend(repo);
+        let storage_root = tempdir().unwrap();
+        let manager = RepoSnapshotManager::new(&backend).with_storage_root(storage_root.path());
+        let snapshot = manager.create_snapshot(&CreateGhostCommitOptions::new(repo))?;
+        assert_eq!(snapshot.kind(), RevisionControlKind::Darcs);
+
+        std::fs::write(repo.join("tracked.txt"), "after snapshot\n").unwrap();
+        std::fs::remove_file(repo.join("notes.txt")).unwrap();
+
+        manager.restore_snapshot(repo, &snapshot)?;
+
+        let restored_tracked = std::fs::read_to_string(repo.join("tracked.txt")).unwrap();
+        assert_eq!(restored_tracked, "edited contents\n");
+
+        let restored_notes = std::fs::read_to_string(repo.join("notes.txt")).unwrap();
+        assert_eq!(restored_notes, "temporary notes\n");
+
         Ok(())
     }
 }

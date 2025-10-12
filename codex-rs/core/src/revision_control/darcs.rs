@@ -91,26 +91,57 @@ pub async fn workspace_diff(cwd: &Path) -> io::Result<String> {
         return Ok(String::new());
     }
 
-    let output = timeout(
-        DARCS_COMMAND_TIMEOUT,
-        Command::new("darcs")
-            .args(["whatsnew", "--unified", "--color=always", "--look-for-adds"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .current_dir(cwd)
-            .output(),
-    )
-    .await
-    .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "darcs whatsnew timed out"))??;
-
-    if output.status.success() || output.status.code() == Some(1) {
-        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-    } else {
-        Err(io::Error::other(format!(
-            "darcs whatsnew failed with status {}",
-            output.status
-        )))
+    if let Some(diff) = run_workspace_diff(cwd, true).await? {
+        return Ok(diff);
     }
+
+    if let Some(diff) = run_workspace_diff(cwd, false).await? {
+        return Ok(diff);
+    }
+
+    Err(io::Error::other("darcs whatsnew failed to produce output"))
+}
+
+async fn run_workspace_diff(cwd: &Path, use_color: bool) -> io::Result<Option<String>> {
+    let mut command = Command::new("darcs");
+    command
+        .args(["whatsnew", "--unified", "--look-for-adds", "--no-summary"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .current_dir(cwd);
+
+    if use_color {
+        command.arg("--color=always");
+    }
+
+    let output = timeout(DARCS_COMMAND_TIMEOUT, command.output())
+        .await
+        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "darcs whatsnew timed out"))??;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+
+    if output.status.success() {
+        return Ok(Some(stdout));
+    }
+
+    if output.status.code() == Some(1) && stderr.trim().is_empty() {
+        if stdout.trim() == "No changes!" {
+            return Ok(Some(String::new()));
+        }
+
+        return Ok(Some(stdout));
+    }
+
+    if use_color {
+        return Ok(None);
+    }
+
+    Err(io::Error::other(format!(
+        "darcs whatsnew failed with status {}: {}",
+        output.status,
+        stderr.trim()
+    )))
 }
 
 async fn latest_patch_hash(cwd: &Path) -> Option<String> {

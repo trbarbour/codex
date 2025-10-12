@@ -19,6 +19,7 @@ mod otel;
 mod prompt_caching;
 mod read_file;
 mod review;
+mod revision_control_darcs;
 mod rmcp_client;
 mod rollout_list_find;
 mod seatbelt;
