@@ -15,12 +15,30 @@ if ! command -v nix >/dev/null 2>&1; then
 fi
 
 echo "==> Running Rust tests (workspace, all features)"
-nix develop .#codex-rs --command cargo test --workspace --all-features
+nix develop .#codex-rs --command bash -c '
+  set -euo pipefail
+  cd codex-rs
+  cargo test --workspace --all-features
+'
+
+echo
+
+echo "==> Building Codex CLI binary for SDK tests"
+nix develop .#codex-rs --command bash -c '
+  set -euo pipefail
+  cd codex-rs
+  cargo build -p codex-cli
+'
 
 echo
 
 echo "==> Running TypeScript SDK tests"
-nix develop .#codex-cli --command bash -c 'cd sdk/typescript && pnpm install --frozen-lockfile && pnpm test'
+nix develop .#codex-cli --command bash -c '
+  set -euo pipefail
+  cd sdk/typescript
+  pnpm install --frozen-lockfile
+  pnpm test
+'
 
 echo
 
