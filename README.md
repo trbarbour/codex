@@ -94,6 +94,7 @@ Codex CLI supports a rich set of configuration options, with preferences stored 
   - [System Requirements](./docs/install.md#system-requirements)
   - [DotSlash](./docs/install.md#dotslash)
   - [Build from source](./docs/install.md#build-from-source)
+- [**NixOS build guide**](./docs/nixos.md)
 - [**FAQ**](./docs/faq.md)
 - [**Open source fund**](./docs/open-source-fund.md)
 
