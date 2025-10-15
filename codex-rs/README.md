@@ -11,6 +11,14 @@ npm i -g @openai/codex
 codex
 ```
 
+## Rust toolchain
+
+The Rust workspace uses the 2024 edition and is pinned to the stable
+`1.90.0` toolchain via [`rust-toolchain.toml`](rust-toolchain.toml).
+If you see build failures complaining about unstable `let` chains,
+double-check that you're building with at least Rust 1.90 on the stable
+channel so the 2024 edition features are available.
+
 You can also install via Homebrew (`brew install codex`) or download a platform-specific release directly from our [GitHub Releases](https://github.com/openai/codex/releases).
 
 ## What's new in the Rust CLI

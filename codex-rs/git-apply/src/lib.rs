@@ -183,15 +183,17 @@ pub fn extract_paths_from_patch(diff_text: &str) -> Vec<String> {
     });
     let mut set = std::collections::BTreeSet::new();
     for caps in RE.captures_iter(diff_text) {
-        if let Some(a) = caps.get(1).map(|m| m.as_str())
-            && a != "/dev/null"
-            && !a.trim().is_empty()
+        if let Some(a) = caps
+            .get(1)
+            .map(|m| m.as_str())
+            .filter(|a| *a != "/dev/null" && !a.trim().is_empty())
         {
             set.insert(a.to_string());
         }
-        if let Some(b) = caps.get(2).map(|m| m.as_str())
-            && b != "/dev/null"
-            && !b.trim().is_empty()
+        if let Some(b) = caps
+            .get(2)
+            .map(|m| m.as_str())
+            .filter(|b| *b != "/dev/null" && !b.trim().is_empty())
         {
             set.insert(b.to_string());
         }
@@ -386,12 +388,11 @@ pub fn parse_git_apply_output(
         }
 
         // === Early hints ===
-        if PATCH_FAILED.is_match(line) || DOES_NOT_APPLY.is_match(line) {
-            if let Some(c) = PATCH_FAILED
-                .captures(line)
-                .or_else(|| DOES_NOT_APPLY.captures(line))
-                && let Some(m) = c.name("path")
-            {
+        if let Some(c) = PATCH_FAILED
+            .captures(line)
+            .or_else(|| DOES_NOT_APPLY.captures(line))
+        {
+            if let Some(m) = c.name("path") {
                 add(&mut skipped, m.as_str());
                 last_seen_path = Some(m.as_str().to_string());
             }
