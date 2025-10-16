@@ -15,7 +15,7 @@ if ! command -v nix >/dev/null 2>&1; then
 fi
 
 echo "==> Building Rust workspace (codex-rs)"
-nix develop .#codex-rs --command cargo build --workspace --locked
+nix develop .#codex-rs --command bash -c 'cd codex-rs && cargo build --workspace --locked'
 
 echo
 
