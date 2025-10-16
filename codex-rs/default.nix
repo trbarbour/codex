@@ -1,11 +1,20 @@
-{ pkgs, monorep-deps ? [], ... }:
+{ pkgs, monorepo-deps ? [], ... }:
 let
   env = {
     PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig:$PKG_CONFIG_PATH";
   };
+  rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+  rustPlatform = pkgs.makeRustPlatform {
+    cargo = rustToolchain;
+    rustc = rustToolchain;
+  };
+  nativeBuildInputs = with pkgs; [
+    pkg-config
+    openssl
+  ];
 in
 rec {
-  package = pkgs.rustPlatform.buildRustPackage {
+  package = rustPlatform.buildRustPackage {
     inherit env;
     pname = "codex-rs";
     version = "0.1.0";
@@ -17,10 +26,7 @@ rec {
     };
     doCheck = false;
     src = ./.;
-    nativeBuildInputs = with pkgs; [
-      pkg-config
-      openssl
-    ];
+    nativeBuildInputs = nativeBuildInputs;
     meta = with pkgs.lib; {
       description = "OpenAI Codex command‑line interface rust implementation";
       license = licenses.asl20;
@@ -30,14 +36,12 @@ rec {
   devShell = pkgs.mkShell {
     inherit env;
     name = "codex-rs-dev";
-    packages = monorep-deps ++ [
-      pkgs.cargo
-      package
+    packages = monorepo-deps ++ nativeBuildInputs ++ [
+      rustToolchain
     ];
     shellHook = ''
       echo "Entering development shell for codex-rs"
       alias codex="cd ${package.src}/tui; cargo run; cd -"
-      ${pkgs.rustPlatform.cargoSetupHook}
     '';
   };
   app = {
