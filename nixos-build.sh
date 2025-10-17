@@ -14,6 +14,10 @@ if ! command -v nix >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "==> Checking pinned tool versions"
+nix develop .#codex-cli --command bash -c './scripts/check-pnpm-version.sh'
+nix develop .#codex-rs --command bash -c './scripts/check-rust-version.sh'
+
 echo "==> Building Rust workspace (codex-rs)"
 nix develop .#codex-rs --command bash -c 'cd codex-rs && cargo build --workspace --locked'
 
