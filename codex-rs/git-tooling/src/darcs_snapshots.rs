@@ -15,7 +15,7 @@ use crate::errors::DarcsSnapshotError;
 use crate::errors::SnapshotError;
 
 #[derive(Clone)]
-pub(crate) struct DarcsSnapshot {
+pub struct DarcsSnapshot {
     id: String,
     relative_path: Option<PathBuf>,
     storage: Arc<TempDir>,
