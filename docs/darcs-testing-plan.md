@@ -141,5 +141,5 @@ repositories behave on par with Git across the Codex product surface.
 - ✅ `cargo test -p codex-core darcs_repositories_emit_initial_guidance`
 - ✅ `cargo test -p codex-git-tooling`
 - ✅ `cargo test -p codex-cloud-tasks`
-- ⚠️ Manual functional verification, workspace-wide test suite, and cross-platform checks remain outstanding.
+- ⚠️ `cargo test --workspace --all-features` fails in this sandbox because the Landlock-backed `codex-exec` tests cannot initialize the kernel sandbox (`Sandbox(LandlockRestrict)`); manual functional verification and cross-platform checks remain outstanding.【7bdde7†L1-L19】
 

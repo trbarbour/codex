@@ -157,3 +157,4 @@ Carry out the verification steps described in [docs/darcs-testing-plan.md](../da
 
 - ✅ Automated regression tests covering Darcs metadata, guidance, snapshots, and cloud tasks succeed with `darcs` 2.18.4 installed.【263e8d†L1-L27】【90eca2†L1-L9】【7ae0b3†L1-L15】【8a2167†L1-L25】【7aa85d†L1-L13】【62df51†L1-L5】
 - ⚠️ Manual functional verification (TUI flows, exec/trust, release tooling, negative PATH scenarios, cross-platform checks) still needs to be performed.
+- ⚠️ `cargo test --workspace --all-features` currently fails in this sandbox because the Landlock-backed `codex-exec` tests error with `Sandbox(LandlockRestrict)`; reruns require a host with Landlock enabled.【7bdde7†L1-L19】
