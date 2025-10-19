@@ -137,5 +137,9 @@ repositories behave on par with Git across the Codex product surface.
 
 ## Testing status
 
-- ⚠️ Tests not run (QA planning only).
+- ✅ `cargo test -p codex-core revision_control_darcs`
+- ✅ `cargo test -p codex-core darcs_repositories_emit_initial_guidance`
+- ✅ `cargo test -p codex-git-tooling`
+- ✅ `cargo test -p codex-cloud-tasks`
+- ⚠️ Manual functional verification, workspace-wide test suite, and cross-platform checks remain outstanding.
 
