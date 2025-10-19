@@ -9,6 +9,8 @@ use crate::client_common::REVIEW_PROMPT;
 use crate::event_mapping::map_response_item_to_event_messages;
 use crate::function_tool::FunctionCallError;
 use crate::review_format::format_review_findings_block;
+use crate::revision_control::RevisionControlKind;
+use crate::revision_control::detect_revision_control;
 use crate::terminal;
 use crate::user_notification::UserNotifier;
 use async_channel::Receiver;
@@ -730,6 +732,23 @@ impl Session {
             Some(turn_context.sandbox_policy.clone()),
             Some(self.user_shell().clone()),
         )));
+        if let Some(revision_control) = detect_revision_control(&turn_context.cwd)
+            && revision_control.kind == RevisionControlKind::Darcs
+        {
+            let mut guidance = format!(
+                "Darcs repository detected at `{}`. Use the Darcs CLI (for example, `darcs whatsnew --unified --look-for-adds`, `darcs changes`, or `darcs status`) to inspect and manage changes. Git commands will fail in this workspace.",
+                revision_control.root.display()
+            );
+            if let Some(tooling_error) = revision_control.tooling_error.as_deref() {
+                guidance.push_str("\n\n");
+                guidance.push_str(tooling_error);
+            }
+            items.push(ResponseItem::Message {
+                id: None,
+                role: "user".to_string(),
+                content: vec![ContentItem::InputText { text: guidance }],
+            });
+        }
         items
     }
 
@@ -2489,6 +2508,28 @@ mod tests {
         let reconstructed = session.reconstruct_history_from_rollout(&turn_context, &rollout_items);
 
         assert_eq!(expected, reconstructed);
+    }
+
+    #[test]
+    fn darcs_repositories_emit_initial_guidance() {
+        let (session, mut turn_context) = make_session_and_context();
+        let darcs_repo = tempfile::tempdir().expect("create darcs temp dir");
+        std::fs::create_dir(darcs_repo.path().join("_darcs")).expect("create _darcs metadata");
+        turn_context.cwd = darcs_repo.path().to_path_buf();
+
+        let items = session.build_initial_context(&turn_context);
+        let found_guidance = items.iter().any(|item| {
+            if let ResponseItem::Message { role, content, .. } = item {
+                if role == "user" {
+                    return content.iter().any(|entry| {
+                        matches!(entry, ContentItem::InputText { text } if text.contains("Darcs repository detected") && text.contains("darcs whatsnew"))
+                    });
+                }
+            }
+            false
+        });
+
+        assert!(found_guidance, "initial context missing Darcs guidance");
     }
 
     #[test]
