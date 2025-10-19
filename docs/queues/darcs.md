@@ -26,6 +26,7 @@ logic can slot in next to the existing Git implementation.【F:codex-rs/core/src
 | 7. Integrate Darcs with environment detection and release tooling | ✅ Completed | Environment auto-detection now inspects Darcs repo preferences alongside Git remotes, and the release helper exposes a Darcs workflow gated by a new `--backend` flag.【F:codex-rs/cloud-tasks/src/env_detect.rs†L1-L292】【F:codex-rs/scripts/create_github_release†L1-L286】 |
 | 8. Update documentation and configuration guidance | ✅ Completed | Getting started, exec, config, install, and revision-control docs now call out Darcs detection, CLI flags, and migration tips.【F:docs/getting-started.md†L1-L48】【F:docs/exec.md†L70-L100】【F:docs/config.md†L1-L220】【F:docs/install.md†L1-L40】【F:docs/revision-control.md†L1-L210】 |
 | 9. Build automated test coverage for Darcs | ✅ Completed | Added metadata/diff integration tests, Darcs snapshot round-trip coverage, ensured rollouts persist Darcs metadata, and taught CI/just workflows to install Darcs when available while skipping Darcs suites when the CLI is missing.【F:codex-rs/core/tests/suite/revision_control_darcs.rs†L1-L220】【F:codex-rs/git-tooling/src/lib.rs†L1-L220】【F:.github/workflows/rust-ci.yml†L147-L186】【F:.github/workflows/rust-release.yml†L81-L120】【F:codex-rs/justfile†L34-L60】 |
+| 10. Execute comprehensive Darcs testing plan | 🟡 Planned | Run the manual and automated checks outlined in [docs/darcs-testing-plan.md](../darcs-testing-plan.md) to validate the shipped Darcs integration end-to-end. |
 
 ### 1. Abstract repository/revision detection
 Introduce a `RevisionControlSystem` trait that reports repository type, root, and capabilities. Update config loading, CLI
@@ -140,4 +141,14 @@ Extend unit and integration tests to exercise both Git and Darcs backends, with 
    and Darcs.
 3. Update CI scripts/Justfile to install Darcs where possible and skip Darcs suites when the binary is missing, documenting the
    expected behaviour.
+:::
+
+### 10. Execute comprehensive Darcs testing plan
+Carry out the verification steps described in [docs/darcs-testing-plan.md](../darcs-testing-plan.md) to ensure no regressions slip through.
+
+:::task-stub{title="Run through the comprehensive Darcs testing plan"}
+1. Follow the environment and tooling setup prerequisites from `docs/darcs-testing-plan.md`, confirming `darcs` availability and preparing sample repositories.
+2. Execute each automated test suite listed in the plan, recording outcomes and filing bugs for any failures or missing coverage.
+3. Perform the manual verification scenarios (UI, rollouts, snapshots, release tooling), capturing evidence/screenshots and updating this queue entry with findings.
+4. Validate negative/skip scenarios and cross-platform expectations, ensuring documentation updates or follow-up issues are created where behaviour diverges from the plan.
 :::
