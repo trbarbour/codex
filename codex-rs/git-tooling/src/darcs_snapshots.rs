@@ -73,7 +73,7 @@ pub(crate) fn create_snapshot(
     }
 
     let relative = ensure_scope_within_repo(repo_root, scope)?;
-    run_darcs_record_dry_run(repo_root)?;
+    verify_darcs_repository(repo_root)?;
 
     std::fs::create_dir_all(storage_root).map_err(|source| {
         SnapshotError::from(DarcsSnapshotError::StoragePath {
@@ -150,20 +150,8 @@ fn non_empty_path(path: &Path) -> Option<PathBuf> {
     }
 }
 
-fn run_darcs_record_dry_run(repo_root: &Path) -> Result<(), DarcsSnapshotError> {
-    run_darcs_for_status(
-        repo_root,
-        [
-            "record",
-            "--dry-run",
-            "--all",
-            "--look-for-adds",
-            "--patch",
-            "codex-snapshot",
-            "--author",
-            "Codex Snapshot <snapshot@codex.local>",
-        ],
-    )
+fn verify_darcs_repository(repo_root: &Path) -> Result<(), DarcsSnapshotError> {
+    run_darcs_for_status(repo_root, ["show", "repo"])
 }
 
 fn run_darcs_for_status<I, S>(repo_root: &Path, args: I) -> Result<(), DarcsSnapshotError>
@@ -239,7 +227,7 @@ fn should_include_entry(entry: &DirEntry, repo_root: &Path) -> bool {
         Ok(relative) => relative
             .components()
             .next()
-            .map_or(true, |component| component.as_os_str() != "_darcs"),
+            .is_none_or(|component| component.as_os_str() != "_darcs"),
         Err(_) => true,
     }
 }

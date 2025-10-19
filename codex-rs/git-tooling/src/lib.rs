@@ -208,6 +208,11 @@ mod tests {
 
     #[test]
     fn manager_reports_missing_tool_for_darcs_without_cli() {
+        if darcs_cli_available() {
+            eprintln!("skipping missing Darcs CLI test because the darcs binary is available");
+            return;
+        }
+
         struct Dummy;
 
         impl RevisionControlSystem for Dummy {
