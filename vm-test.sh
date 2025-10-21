@@ -162,12 +162,13 @@ else
   multipass exec "$VM_NAME" -- bash -lc "source \"\$HOME/.nix-profile/etc/profile.d/nix.sh\"; nix --version"
 fi
 
-if ! multipass exec "$VM_NAME" -- bash -lc "\
+TEST_STATUS=0
+multipass exec "$VM_NAME" -- bash -lc "\
   set -euo pipefail; \
   source \"\$HOME/.nix-profile/etc/profile.d/nix.sh\"; \
   cd \"\$HOME/codex\"; \
-  ./nixos-test.sh"; then
-  TEST_STATUS=$?
+  ./nixos-test.sh" || TEST_STATUS=$?
+if [[ "$TEST_STATUS" -ne 0 ]]; then
   echo "==> nixos-test.sh failed inside the VM" >&2
   if [[ "$DELETE_ON_EXIT" == "1" && "$KEEP_VM_FLAG" != "1" ]]; then
     echo "==> Keeping the VM running for debugging. Run 'multipass delete $VM_NAME' and 'multipass purge' when finished." >&2
