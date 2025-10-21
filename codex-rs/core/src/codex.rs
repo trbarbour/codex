@@ -2519,12 +2519,13 @@ mod tests {
 
         let items = session.build_initial_context(&turn_context);
         let found_guidance = items.iter().any(|item| {
-            if let ResponseItem::Message { role, content, .. } = item
-                && role == "user" {
+            if let ResponseItem::Message { role, content, .. } = item {
+                if role == "user" {
                     return content.iter().any(|entry| {
                         matches!(entry, ContentItem::InputText { text } if text.contains("Darcs repository detected") && text.contains("darcs whatsnew"))
                     });
                 }
+            }
             false
         });
 
