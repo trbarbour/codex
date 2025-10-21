@@ -187,14 +187,13 @@ fn append_untracked_warning(mut diff: String, warning: &str) -> String {
 }
 
 async fn latest_patch_hash(cwd: &Path) -> Option<String> {
-    if let Ok(output) = run_darcs_capture(cwd, ["changes", "--last=1", "--xml"]).await {
-        if output.status.success() {
+    if let Ok(output) = run_darcs_capture(cwd, ["changes", "--last=1", "--xml"]).await
+        && output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
             if let Some(hash) = find_attr_value(&text, "hash") {
                 return Some(hash);
             }
         }
-    }
 
     let output = run_darcs_capture(cwd, ["changes", "--last=1"]).await.ok()?;
     if !output.status.success() {
