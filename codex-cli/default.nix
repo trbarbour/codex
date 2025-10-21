@@ -1,9 +1,13 @@
 { pkgs, monorepo-deps ? [], ... }:
 let
   nodejs = if pkgs ? nodejs_22 then pkgs.nodejs_22 else pkgs.nodejs;
+  pnpmHome =
+    let
+      home = builtins.getEnv "HOME";
+    in
+    if home == "" then throw "HOME environment variable not set" else "${home}/.pnpm";
   env = {
-    PNPM_HOME = "$HOME/.pnpm";
-    PATH = "$PNPM_HOME:$PATH";
+    PNPM_HOME = pnpmHome;
   };
   commonPackages = monorepo-deps ++ [
     nodejs
