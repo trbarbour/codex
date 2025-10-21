@@ -228,6 +228,8 @@ mod tests {
             .output()
             .unwrap();
 
+        configure_git_identity(repo_path);
+
         std::fs::write(repo_path.join("README.md"), "# Test Repo").unwrap();
         std::process::Command::new("git")
             .current_dir(repo_path)

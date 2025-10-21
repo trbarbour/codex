@@ -905,8 +905,11 @@ impl CodexMessageProcessor {
                             break;
                         }
                         event = conversation_clone.next_event() => {
-                            if let Ok(event) = event && matches!(event.msg, EventMsg::ShutdownComplete) {
-                                break;
+                            match event {
+                                Ok(event) if matches!(event.msg, EventMsg::ShutdownComplete) => {
+                                    break;
+                                }
+                                _ => {}
                             }
                         }
                     }
