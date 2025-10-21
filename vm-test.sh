@@ -13,7 +13,7 @@ Options:
   --name NAME         Name for the Multipass instance (default: codex-test-vm)
   --image RELEASE     Ubuntu release to launch (default: 22.04)
   --cpus COUNT        Number of virtual CPUs (default: 4)
-  --mem SIZE          Amount of RAM to allocate (default: 8G)
+  --memory SIZE       Amount of RAM to allocate (default: 8G)
   --disk SIZE         Disk size for the VM (default: 40G)
   --keep-vm           Leave the VM running after the script exits
   -h, --help          Show this help message
@@ -60,7 +60,12 @@ while [[ $# -gt 0 ]]; do
       VM_CPUS="$2"
       shift 2
       ;;
+    --memory)
+      VM_MEM="$2"
+      shift 2
+      ;;
     --mem)
+      echo "vm-test.sh: '--mem' is deprecated, use '--memory' instead" >&2
       VM_MEM="$2"
       shift 2
       ;;
@@ -99,7 +104,7 @@ if multipass info "$VM_NAME" >/dev/null 2>&1; then
   echo "==> Reusing existing Multipass instance '$VM_NAME'"
 else
   echo "==> Launching Multipass instance '$VM_NAME'"
-  multipass launch "${VM_IMAGE}" --name "$VM_NAME" --cpus "$VM_CPUS" --mem "$VM_MEM" --disk "$VM_DISK"
+  multipass launch "${VM_IMAGE}" --name "$VM_NAME" --cpus "$VM_CPUS" --memory "$VM_MEM" --disk "$VM_DISK"
   DELETE_ON_EXIT=1
 fi
 
