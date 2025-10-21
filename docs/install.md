@@ -44,3 +44,20 @@ cargo clippy --tests
 # Run the tests.
 cargo test
 ```
+
+### Run the Codex tests inside a virtual machine
+
+If your local environment cannot execute the full test suite (for example,
+because of sandbox limitations), you can offload the work to a
+clean Ubuntu VM using the helper script at the repository root:
+
+```bash
+./vm-test.sh
+```
+
+The script uses [Multipass](https://multipass.run/) to start an Ubuntu 22.04 VM,
+copies the current checkout into the guest, installs Nix, and executes
+`./nixos-test.sh` inside the VM. By default it deletes the VM after the run; pass
+`--keep-vm` (or set `KEEP_VM=1`) if you want to inspect the machine afterwards.
+You can customise the instance name, CPU, memory, disk, or Ubuntu release by
+providing `--name`, `--cpus`, `--mem`, `--disk`, or `--image` flags respectively.
