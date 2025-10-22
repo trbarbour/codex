@@ -91,11 +91,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 if ! command -v multipass >/dev/null 2>&1; then
-  cat <<'EOF' >&2
-vm-test.sh: Multipass is not available on PATH.
-Install it from https://multipass.run/ and try again.
-EOF
-  exit 1
+  echo "vm-test.sh: Multipass is not available on PATH."
+  echo "==> Running nixos-test.sh directly on the host instead"
+  ./nixos-test.sh
+  exit $?
 fi
 
 DELETE_ON_EXIT=0

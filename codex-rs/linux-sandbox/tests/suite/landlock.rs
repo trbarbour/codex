@@ -8,6 +8,7 @@ use codex_core::exec::process_exec_tool_call;
 use codex_core::exec_env::create_env;
 use codex_core::protocol::SandboxPolicy;
 use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
 
@@ -28,6 +29,10 @@ const NETWORK_TIMEOUT_MS: u64 = 2_000;
 #[cfg(target_arch = "aarch64")]
 const NETWORK_TIMEOUT_MS: u64 = 10_000;
 
+fn landlock_supported() -> bool {
+    Path::new("/sys/kernel/security/landlock/features").exists()
+}
+
 fn create_env_from_core_vars() -> HashMap<String, String> {
     let policy = ShellEnvironmentPolicy::default();
     create_env(&policy)
@@ -35,6 +40,10 @@ fn create_env_from_core_vars() -> HashMap<String, String> {
 
 #[expect(clippy::print_stdout, clippy::expect_used, clippy::unwrap_used)]
 async fn run_cmd(cmd: &[&str], writable_roots: &[PathBuf], timeout_ms: u64) {
+    if !landlock_supported() {
+        eprintln!("skipping: Landlock not available on this system");
+        return;
+    }
     let cwd = std::env::current_dir().expect("cwd should exist");
     let sandbox_cwd = cwd.clone();
     let params = ExecParams {
@@ -83,6 +92,10 @@ async fn test_root_read() {
 #[tokio::test]
 #[should_panic]
 async fn test_root_write() {
+    if !landlock_supported() {
+        eprintln!("skipping: Landlock not available on this system");
+        panic!("skipping due to missing Landlock support");
+    }
     let tmpfile = NamedTempFile::new().unwrap();
     let tmpfile_path = tmpfile.path().to_string_lossy();
     run_cmd(
@@ -126,6 +139,10 @@ async fn test_writable_root() {
 #[tokio::test]
 #[should_panic(expected = "Sandbox(Timeout")]
 async fn test_timeout() {
+    if !landlock_supported() {
+        eprintln!("skipping: Landlock not available on this system");
+        panic!("Sandbox(Timeout: Landlock not available");
+    }
     run_cmd(&["sleep", "2"], &[], 50).await;
 }
 
@@ -135,6 +152,10 @@ async fn test_timeout() {
 /// suite remains green on leaner CI images.
 #[expect(clippy::expect_used)]
 async fn assert_network_blocked(cmd: &[&str]) {
+    if !landlock_supported() {
+        eprintln!("skipping: Landlock not available on this system");
+        return;
+    }
     let cwd = std::env::current_dir().expect("cwd should exist");
     let sandbox_cwd = cwd.clone();
     let params = ExecParams {
