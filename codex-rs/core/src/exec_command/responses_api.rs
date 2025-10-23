@@ -29,7 +29,7 @@ pub fn create_exec_command_tool_for_responses_api() -> ResponsesApiTool {
     properties.insert(
         "shell".to_string(),
         JsonSchema::String {
-            description: Some("The shell to use. Defaults to \"/bin/bash\".".to_string()),
+            description: Some("The shell to use. Defaults to the system bash path.".to_string()),
         },
     );
     properties.insert(

@@ -33,7 +33,7 @@ fn default_login() -> bool {
 }
 
 fn default_shell() -> String {
-    "/bin/bash".to_string()
+    crate::shell::system_bash_path()
 }
 
 #[derive(Debug, Deserialize, Serialize)]

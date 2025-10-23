@@ -376,7 +376,7 @@ PY"#
             cmd,
             yield_time_ms: 3_000,
             max_output_tokens: 1_000, // large enough to avoid truncation here
-            shell: "/bin/bash".to_string(),
+            shell: crate::shell::system_bash_path(),
             login: false,
         };
         let initial_output = match session_manager

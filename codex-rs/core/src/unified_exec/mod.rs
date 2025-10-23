@@ -470,10 +470,11 @@ mod tests {
 
         let manager = UnifiedExecSessionManager::default();
 
+        let bash_invocation = [crate::shell::system_bash_path(), "-i".to_string()];
         let shell_a = manager
             .handle_request(UnifiedExecRequest {
                 session_id: None,
-                input_chunks: &["/bin/bash".to_string(), "-i".to_string()],
+                input_chunks: &bash_invocation,
                 timeout_ms: Some(2_500),
             })
             .await?;
@@ -613,10 +614,11 @@ mod tests {
 
         let manager = UnifiedExecSessionManager::default();
 
+        let bash_invocation = [crate::shell::system_bash_path(), "-i".to_string()];
         let open_shell = manager
             .handle_request(UnifiedExecRequest {
                 session_id: None,
-                input_chunks: &["/bin/bash".to_string(), "-i".to_string()],
+                input_chunks: &bash_invocation,
                 timeout_ms: Some(2_500),
             })
             .await?;
