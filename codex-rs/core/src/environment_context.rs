@@ -309,7 +309,7 @@ mod tests {
             Some(AskForApproval::OnRequest),
             Some(workspace_write_policy(vec!["/repo"], false)),
             Some(Shell::Bash(BashShell {
-                shell_path: "/bin/bash".into(),
+                shell_path: crate::shell::system_bash_path(),
                 bashrc_path: "/home/user/.bashrc".into(),
             })),
         );

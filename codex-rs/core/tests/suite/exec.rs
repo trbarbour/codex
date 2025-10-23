@@ -104,7 +104,8 @@ async fn exit_command_not_found_is_ok() {
     }
 
     let tmp = TempDir::new().expect("should be able to create temp dir");
-    let cmd = vec!["/bin/bash", "-c", "nonexistent_command_12345"];
+    let bash = codex_core::shell::system_bash_path();
+    let cmd = vec![bash.as_str(), "-c", "nonexistent_command_12345"];
     run_test_cmd(tmp, cmd).await.unwrap();
 }
 

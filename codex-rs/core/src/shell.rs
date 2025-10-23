@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 use shlex;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -103,6 +104,62 @@ impl Shell {
             Shell::Unknown => None,
         }
     }
+}
+
+pub fn system_bash_path() -> String {
+    system_bash_path_impl().unwrap_or_else(|| "/bin/bash".to_string())
+}
+
+fn system_bash_path_impl() -> Option<String> {
+    #[cfg(unix)]
+    {
+        if let Some(path) = std::env::var("SHELL")
+            .ok()
+            .filter(|value| !value.is_empty())
+            .filter(|value| value.ends_with("bash"))
+            .and_then(|value| ensure_executable_path(&value))
+        {
+            return Some(path);
+        }
+
+        if let Some(path) = detect_bash_from_passwd() {
+            return Some(path);
+        }
+    }
+
+    which::which("bash")
+        .ok()
+        .and_then(|path| path.to_str().map(|value| value.to_string()))
+}
+
+#[cfg(unix)]
+fn detect_bash_from_passwd() -> Option<String> {
+    use libc::getpwuid;
+    use libc::getuid;
+    use std::ffi::CStr;
+
+    unsafe {
+        let uid = getuid();
+        let pw = getpwuid(uid);
+
+        if pw.is_null() {
+            return None;
+        }
+
+        let shell_path = CStr::from_ptr((*pw).pw_shell)
+            .to_string_lossy()
+            .into_owned();
+
+        if shell_path.ends_with("/bash") {
+            return ensure_executable_path(&shell_path);
+        }
+    }
+
+    None
+}
+
+fn ensure_executable_path(path: &str) -> Option<String> {
+    Path::new(path).exists().then(|| path.to_string())
 }
 
 fn format_shell_invocation_with_rc(
@@ -266,37 +323,38 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_with_profile_bashrc_not_exists() {
+        let shell_path = system_bash_path();
         let shell = Shell::Bash(BashShell {
-            shell_path: "/bin/bash".to_string(),
+            shell_path: shell_path.clone(),
             bashrc_path: "/does/not/exist/.bashrc".to_string(),
         });
         let actual_cmd = shell.format_default_shell_invocation(vec!["myecho".to_string()]);
         assert_eq!(
             actual_cmd,
-            Some(vec![
-                "/bin/bash".to_string(),
-                "-lc".to_string(),
-                "myecho".to_string()
-            ])
+            Some(vec![shell_path, "-lc".to_string(), "myecho".to_string()])
         );
     }
 
     #[tokio::test]
     async fn test_run_with_profile_bash_escaping_and_execution() {
-        let shell_path = "/bin/bash";
+        let shell_path = system_bash_path();
 
         let cases = vec![
             (
                 vec!["myecho"],
-                vec![shell_path, "-lc", "source BASHRC_PATH && (myecho)"],
+                vec![
+                    shell_path.clone(),
+                    "-lc".to_string(),
+                    "source BASHRC_PATH && (myecho)".to_string(),
+                ],
                 Some("It works!\n"),
             ),
             (
                 vec!["bash", "-lc", "echo 'single' \"double\""],
                 vec![
-                    shell_path,
-                    "-lc",
-                    "source BASHRC_PATH && (echo 'single' \"double\")",
+                    shell_path.clone(),
+                    "-lc".to_string(),
+                    "source BASHRC_PATH && (echo 'single' \"double\")".to_string(),
                 ],
                 Some("single double\n"),
             ),
@@ -323,7 +381,7 @@ mod tests {
             )
             .unwrap();
             let shell = Shell::Bash(BashShell {
-                shell_path: shell_path.to_string(),
+                shell_path: shell_path.clone(),
                 bashrc_path: bashrc_path.to_str().unwrap().to_string(),
             });
 
