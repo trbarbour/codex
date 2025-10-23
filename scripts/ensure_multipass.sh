@@ -13,20 +13,25 @@ fi
 if command -v apt-get >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
 
-  apt_updated=0
-  ensure_apt_updated() {
-    if [[ ${apt_updated} -eq 0 ]]; then
-      apt-get update
-      apt_updated=1
-    fi
-  }
-
   # Only attempt the installation if the package exists in the repository to
   # avoid noisy errors on distributions where Multipass is distributed via snap.
   if apt-cache show multipass >/dev/null 2>&1; then
-    ensure_apt_updated
     if ! dpkg-query -W -f='${Status}' multipass 2>/dev/null | grep -q 'install ok installed'; then
-      apt-get install -y multipass
+      if [[ $(id -u) -ne 0 ]]; then
+        cat >&2 <<'EOF'
+warning: Multipass installation skipped because apt-get requires root privileges.
+EOF
+      else
+        if ! apt-get update; then
+          cat >&2 <<'EOF'
+warning: Failed to run 'apt-get update'. Install Multipass manually if needed.
+EOF
+        elif ! apt-get install -y multipass; then
+          cat >&2 <<'EOF'
+warning: Failed to install Multipass via apt-get. Install it manually if needed.
+EOF
+        fi
+      fi
     fi
   fi
 fi
