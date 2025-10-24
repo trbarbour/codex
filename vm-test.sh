@@ -31,6 +31,58 @@ necessary), and executes ./nixos-test.sh inside the virtual machine.
 EOF
 }
 
+require_linux_qemu_driver() {
+  if [[ "$(uname -s)" != "Linux" ]]; then
+    return 0
+  fi
+
+  local driver
+  driver=$(multipass get local.driver 2>/dev/null || echo "")
+  if [[ -z "${driver}" ]]; then
+    return 0
+  fi
+
+  driver=${driver,,}
+  if [[ "${driver}" == "qemu" ]]; then
+    return 0
+  fi
+
+  cat <<EOF >&2
+vm-test.sh: Multipass is configured to use the '${driver}' driver, which reuses the host kernel.
+Landlock support requires the 'qemu' driver. Run 'multipass set local.driver=qemu' (or
+scripts/ensure_multipass.sh) and try again.
+EOF
+  exit 1
+}
+
+check_vm_landlock() {
+  local check_script
+  local IFS=
+  read -r -d '' check_script <<'EOS' || true
+set -euo pipefail
+if [[ -e /sys/kernel/security/landlock/features ]]; then
+  exit 0
+fi
+if [[ -f /proc/config.gz ]] && zgrep -q "CONFIG_SECURITY_LANDLOCK=y" /proc/config.gz 2>/dev/null; then
+  exit 0
+fi
+config="/boot/config-$(uname -r)"
+if [[ -f "${config}" ]] && grep -q "CONFIG_SECURITY_LANDLOCK=y" "${config}"; then
+  exit 0
+fi
+exit 1
+EOS
+
+  if ! multipass exec "$VM_NAME" -- bash -lc "$check_script"; then
+    cat <<EOF >&2
+vm-test.sh: Multipass instance '$VM_NAME' does not appear to support Landlock.
+Ensure the guest kernel enables CONFIG_SECURITY_LANDLOCK (Ubuntu 22.04+). Recreate the VM
+after updating Multipass or switch drivers if necessary.
+EOF
+    exit 1
+  fi
+}
+
 ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)
 if [[ -z "${ROOT:-}" ]]; then
   echo "vm-test.sh: failed to locate repository root" >&2
@@ -98,6 +150,8 @@ EOF
   exit 1
 fi
 
+require_linux_qemu_driver
+
 DELETE_ON_EXIT=0
 
 if multipass info "$VM_NAME" >/dev/null 2>&1; then
@@ -111,6 +165,14 @@ fi
 if [[ "$KEEP_VM_FLAG" == "1" ]]; then
   DELETE_ON_EXIT=0
 fi
+
+if ! multipass start "$VM_NAME" >/dev/null 2>&1; then
+  echo "vm-test.sh: failed to start Multipass instance '$VM_NAME'" >&2
+  exit 1
+fi
+
+echo "==> Checking Landlock support in '$VM_NAME'"
+check_vm_landlock
 
 TMP_ARCHIVE=$(mktemp -t codex-vm-src.XXXXXX.tar.gz)
 
