@@ -27,6 +27,17 @@ export type RunStreamedResult = StreamedTurn;
 /** An input to send to the agent. */
 export type Input = string;
 
+/** Error thrown when a turn fails. */
+export class ThreadRunError extends Error {
+  public error: ThreadError | null;
+
+  constructor(message: string, error: ThreadError | null = null, cause?: unknown) {
+    super(message, cause ? { cause } : undefined);
+    this.name = "ThreadRunError";
+    this.error = error;
+  }
+}
+
 /** Respesent a thread of conversation with the agent. One thread can have multiple consecutive turns. */
 export class Thread {
   private _exec: CodexExec;
@@ -99,21 +110,33 @@ export class Thread {
     let finalResponse: string = "";
     let usage: Usage | null = null;
     let turnFailure: ThreadError | null = null;
-    for await (const event of generator) {
-      if (event.type === "item.completed") {
-        if (event.item.type === "agent_message") {
-          finalResponse = event.item.text;
+    try {
+      for await (const event of generator) {
+        if (event.type === "item.completed") {
+          if (event.item.type === "agent_message") {
+            finalResponse = event.item.text;
+          }
+          items.push(event.item);
+        } else if (event.type === "turn.completed") {
+          usage = event.usage;
+        } else if (event.type === "turn.failed") {
+          turnFailure = event.error;
+          break;
+        } else if (event.type === "error") {
+          throw new ThreadRunError(event.message);
         }
-        items.push(event.item);
-      } else if (event.type === "turn.completed") {
-        usage = event.usage;
-      } else if (event.type === "turn.failed") {
-        turnFailure = event.error;
-        break;
       }
+    } catch (error) {
+      if (error instanceof ThreadRunError) {
+        throw error;
+      }
+      if (error instanceof Error) {
+        throw new ThreadRunError(error.message, null, error);
+      }
+      throw new ThreadRunError(String(error));
     }
     if (turnFailure) {
-      throw new Error(turnFailure.message);
+      throw new ThreadRunError(turnFailure.message, turnFailure);
     }
     return { items, finalResponse, usage };
   }
