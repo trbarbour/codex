@@ -21,15 +21,35 @@ install_multipass_linux() {
     if snap list multipass >/dev/null 2>&1; then
       return 0
     fi
-    maybe_sudo snap install multipass --classic || return 1
-    return 0
+    if maybe_sudo snap install multipass --classic; then
+      return 0
+    fi
   fi
 
   if command -v apt-get >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
+
+    # Multipass is primarily distributed as a snap.  If snapd is not available
+    # yet, attempt to install it via apt so we can fall back to the snap
+    # installer.
+    if ! command -v snap >/dev/null 2>&1; then
+      maybe_sudo apt-get update || true
+      if maybe_sudo apt-get install -y snapd; then
+        if command -v snap >/dev/null 2>&1; then
+          if snap list multipass >/dev/null 2>&1; then
+            return 0
+          fi
+          if maybe_sudo snap install multipass --classic; then
+            return 0
+          fi
+        fi
+      fi
+    fi
+
     maybe_sudo apt-get update
-    maybe_sudo apt-get install -y multipass
-    return 0
+    if maybe_sudo apt-get install -y multipass; then
+      return 0
+    fi
   fi
 
   return 1
