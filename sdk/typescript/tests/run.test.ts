@@ -17,6 +17,9 @@ import {
 } from "./responsesProxy";
 
 const codexExecPath = path.join(process.cwd(), "..", "..", "codex-rs", "target", "debug", "codex");
+const LANDLOCK_SUPPORTED =
+  process.platform !== "linux" || fs.existsSync("/sys/kernel/security/landlock/features");
+const itWithLandlock = LANDLOCK_SUPPORTED ? it : it.skip;
 
 describe("Codex", () => {
   it("returns thread events", async () => {
@@ -279,7 +282,7 @@ describe("Codex", () => {
       await close();
     }
   });
-  it("runs in provided working directory", async () => {
+  itWithLandlock("runs in provided working directory", async () => {
     const { url, close } = await startResponsesTestProxy({
       statusCode: 200,
       responseBodies: [
@@ -315,7 +318,7 @@ describe("Codex", () => {
     }
   });
 
-  it("throws if working directory is not git and no skipGitRepoCheck is provided", async () => {
+  itWithLandlock("throws if working directory is not git and no skipGitRepoCheck is provided", async () => {
     const { url, close } = await startResponsesTestProxy({
       statusCode: 200,
       responseBodies: [
