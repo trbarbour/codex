@@ -38,6 +38,7 @@ rec {
     name = "codex-rs-dev";
     packages = monorepo-deps ++ nativeBuildInputs ++ [
       rustToolchain
+      pkgs.python3
     ];
     shellHook = ''
       echo "Entering development shell for codex-rs"
