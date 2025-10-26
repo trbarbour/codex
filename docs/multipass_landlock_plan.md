@@ -16,6 +16,9 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
 2. **Capture provisioning metadata**
    - Collect the timestamped setup logs from `/tmp/codex-setup*.log` or the automation hook output to understand which setup iteration removed or skipped Multipass.
    - Record the UID/GID of the automation user, available sudo privileges, and the effective shell so installer scripts can be reproduced faithfully in manual debugging sessions.
+   - **Findings (2025-10-26 21:38:41Z)**
+     - No files matching `/tmp/codex-setup*.log` are present on the container, so prior setup runs either did not emit logs or they have already been removed.
+     - The automation context runs as `root` (`uid=0`, `gid=0`) with implicit full sudo privileges and uses `/bin/bash` as the default shell, matching the expectations of the setup scripts.
 
 ## Phase 2 – Reproduce and capture failure details
 
