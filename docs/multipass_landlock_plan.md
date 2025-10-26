@@ -3,12 +3,13 @@
 ## Context
 - Running `./vm-test.sh` fails immediately because `multipass` is not on the `PATH`.
 - `scripts/codex-environment-setup.sh` invokes `scripts/ensure_multipass.sh`, which attempts to install Multipass via Snap or APT on Linux.
+- The automation hooks (Setup/Maintenance scripts) used for container provisioning already call `codex-environment-setup.sh`, so any failure occurs within that script or its children rather than from a missed invocation.
 - The current Codex container does not have Multipass, indicating the setup script did not install it successfully (likely due to unavailable Snap/Multipass packages in the sandbox environment).
 
 ## Diagnosis Steps
 1. **Confirm setup execution**  
    - Inspect workspace provisioning logs or rerun `scripts/codex-environment-setup.sh` with `set -x` to ensure `ensure_multipass.sh` ran and to capture any error messages that may have been suppressed.
-   - Verify whether the automation hooks (Setup/Maintenance scripts) actually call `codex-environment-setup.sh` on container creation.
+   - Since the automation hooks already invoke `codex-environment-setup.sh`, concentrate on tracing the control flow inside `ensure_multipass.sh` to pinpoint the failure point (e.g., Snap vs. APT branch) and record any exit codes.
 
 2. **Identify available package sources**  
    - Check if `snapd` is installed and functional (e.g., `snap version`). If Snap is unavailable, note the reason (common issues: service not running, cgroup limitations, or missing kernel features).
