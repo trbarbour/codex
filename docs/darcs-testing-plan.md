@@ -57,6 +57,16 @@ repositories behave on par with Git across the Codex product surface.
   Darcs CLI appears exactly once and includes the CLI warning when PATH lacks
   `darcs`.
 
+  - ✅ `codex exec` launched inside a Darcs workspace printed `revision: Darcs` in
+    the config summary and appended the onboarding guidance describing Darcs CLI
+    workflows before our prompt was echoed.【e56847†L1-L14】
+  - ✅ Running the same command from outside any repository exited immediately
+    with the expected "Not inside a Git or Darcs repository" gating message.【5ab290†L1-L3】
+  - ✅ Invoking `codex exec` with `PATH` stripped to remove `darcs` surfaced the
+    revision warning in the config summary and recorded the missing-CLI guidance
+    in the session rollout log, confirming the onboarding message appears once
+    when tooling is absent.【8361e6†L1-L21】【d783eb†L1-L15】
+
 ### Diff & metadata plumbing
 
 - From the TUI `/diff` view, confirm it invokes `darcs::workspace_diff`,
