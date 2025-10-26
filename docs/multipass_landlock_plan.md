@@ -9,6 +9,9 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
 1. **Baseline discovery**
    - Run `command -v multipass` and `multipass version` (guarded with `if command -v multipass >/dev/null`) to confirm the binary is truly absent or determine whether it was installed in a non-standard location.
    - Inspect `scripts/ensure_multipass.sh` for gating environment variables such as `INSTALL_MULTIPASS_SKIP` or `INSTALL_MULTIPASS_FORCE` and document their defaults so subsequent reruns of the setup script can be controlled deterministically.
+   - **Findings (2025-10-26 21:29:18Z)**
+     - `multipass` is not present on `PATH` (`command -v multipass` returned no result), so `multipass version` was not runnable.
+     - `scripts/ensure_multipass.sh` does not define or consult any gating environment variables; installation attempts are driven solely by runtime detection of `snap`, `apt-get`, and `brew` availability.
 
 2. **Capture provisioning metadata**
    - Collect the timestamped setup logs from `/tmp/codex-setup*.log` or the automation hook output to understand which setup iteration removed or skipped Multipass.

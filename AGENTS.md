@@ -13,6 +13,7 @@ In the codex-rs folder where the rust code lives:
 - Use method references over closures when possible per https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
 - Skip clippy cleanups that rely on unstable language features (for example, let chains that require nightly).
 - When writing tests, prefer comparing the equality of entire objects over fields one by one.
+- When documenting time-sensitive findings, always record actual UTC timestamps retrieved from a real command (for example, `date -u +"%Y-%m-%d %H:%M:%SZ"`) instead of inventing values.
 
 Run `just fmt` (in `codex-rs` directory) automatically after making Rust code changes; do not ask for approval to run it. Before finalizing a change to `codex-rs`, run `just fix -p <project>` (in `codex-rs` directory) to fix any linter issues in the code. Prefer scoping with `-p` to avoid slow workspace‑wide Clippy builds; only run `just fix` without `-p` if you changed shared crates. Additionally, run the tests:
 
