@@ -339,7 +339,7 @@ describe("Codex", () => {
         workingDirectory,
       });
       await expect(thread.run("use custom working directory")).rejects.toThrow(
-        /Not inside a trusted directory/,
+        /Not inside (?:a trusted directory|a Git or Darcs repository)/,
       );
     } finally {
       await close();

@@ -23,7 +23,7 @@ export type {
   ErrorItem,
 } from "./items";
 
-export { Thread } from "./thread";
+export { Thread, ThreadRunError } from "./thread";
 export type { RunResult, RunStreamedResult, Input } from "./thread";
 
 export { Codex } from "./codex";
