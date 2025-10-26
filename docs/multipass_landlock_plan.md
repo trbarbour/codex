@@ -1,43 +1,76 @@
 # Plan to Diagnose and Restore Multipass with Landlock Support
 
-## Context
-- Running `./vm-test.sh` fails immediately because `multipass` is not on the `PATH`.
-- `scripts/codex-environment-setup.sh` invokes `scripts/ensure_multipass.sh`, which attempts to install Multipass via Snap or APT on Linux.
-- The automation hooks (Setup/Maintenance scripts) used for container provisioning already call `codex-environment-setup.sh`, so any failure occurs within that script or its children rather than from a missed invocation.
-- The current Codex container does not have Multipass, indicating the setup script did not install it successfully (likely due to unavailable Snap/Multipass packages in the sandbox environment).
+## Updated context
 
-## Diagnosis Steps
-1. **Confirm setup execution**  
-   - Inspect workspace provisioning logs or rerun `scripts/codex-environment-setup.sh` with `set -x` to ensure `ensure_multipass.sh` ran and to capture any error messages that may have been suppressed.
-   - Since the automation hooks already invoke `codex-environment-setup.sh`, concentrate on tracing the control flow inside `ensure_multipass.sh` to pinpoint the failure point (e.g., Snap vs. APT branch) and record any exit codes.
+The immediate symptom is that `./vm-test.sh` exits before running any checks because the `multipass` CLI is missing from `PATH`. The Codex setup pipeline is intended to install Multipass automatically through `scripts/codex-environment-setup.sh`, which in turn delegates to `scripts/ensure_multipass.sh`. Because the automation hooks already execute `codex-environment-setup.sh` during provisioning, the absence of `multipass` implies that `ensure_multipass.sh` exited early or silently failed. The current tasks therefore focus on improving observability, understanding installer constraints inside the sandboxed container, and validating the prerequisites for Landlock once Multipass becomes available.
 
-2. **Identify available package sources**  
-   - Check if `snapd` is installed and functional (e.g., `snap version`). If Snap is unavailable, note the reason (common issues: service not running, cgroup limitations, or missing kernel features).
-   - Check APT repositories for `multipass` availability (`apt-cache policy multipass`). Determine whether package installation fails because repositories are missing, outdated, or require additional keys.
-   - If neither Snap nor APT can install Multipass, document the container limitations (e.g., running inside Docker without systemd) that prevent Snap-based installation.
+## Phase 1 – Reproduce and capture failure details
 
-3. **Verify virtualization support**  
-   - Confirm whether the host permits nested virtualization required by Multipass/QEMU (`egrep -c '(vmx|svm)' /proc/cpuinfo`, `lsmod | grep kvm`).
-   - If virtualization is unavailable, identify required host configuration changes.
+1. **Rerun the installer with tracing**
+   - Execute `env INSTALL_MULTIPASS_VERBOSE=1 bash -x scripts/codex-environment-setup.sh` to capture the full control flow and ensure the Multipass branch is executed.
+   - Confirm whether `ensure_multipass.sh` aborts, returns success despite not installing anything, or skips installation based on gating logic (for example, short-circuiting when running without root privileges).
 
-4. **Landlock capability assessment**  
-   - Once Multipass is installable, ensure the QEMU driver is active by running `multipass get local.driver` (expect `qemu`).
-   - Boot a test instance and confirm the guest kernel supports Landlock (`grep LANDLOCK /boot/config-$(uname -r)` inside the VM or `uname -r` vs kernel >= 5.13).
+2. **Collect existing provisioning logs**
+   - Inspect `/tmp/codex-setup*.log` (if the setup script already writes logs) or container provisioning output to understand earlier runs.
+   - Note any repeated transient failures (network timeouts, repository errors) that may necessitate retries or mirrors.
 
-## Remediation Plan
-1. **Adjust installation script**  
-   - Enhance `scripts/ensure_multipass.sh` to emit verbose diagnostics and fail loudly when installation paths are exhausted, so provisioning surfaces the root cause.
-   - Add a fallback installer (e.g., download the official Multipass `.deb` release) when Snap and APT paths are unavailable.
+## Phase 2 – Determine viable installation sources
 
-2. **Provision host prerequisites**  
-   - If Snap is required, update the workspace setup to enable `snapd` (start its daemon) and configure necessary cgroups/systemd integration.
-   - Ensure nested virtualization modules (`kvm`, `kvm_intel`/`kvm_amd`) are loaded on the host; document steps for the infrastructure team if manual intervention is necessary.
+1. **Evaluate Snap path**
+   - Check whether `snapd` is installed and running (`snap version`, `systemctl status snapd`, `journalctl -u snapd`).
+   - Document sandbox limitations such as lack of `systemd`, missing cgroup controllers, or read-only filesystems that prevent Snap from working, and capture the exact error messages.
 
-3. **Automated verification**  
-   - Extend `ensure_multipass.sh` to run `multipass info --all` or launch a lightweight VM to confirm the QEMU driver and kernel Landlock support after installation.
-   - Update CI or maintenance scripts to periodically run `./vm-test.sh --smoke-check` (if available) to catch regressions in Multipass availability early.
+2. **Evaluate APT path**
+   - Inspect `apt-cache policy multipass` and `apt-cache show multipass` to confirm package availability and required repository components.
+   - Verify that `apt-get update` succeeds and that Multipass dependencies (notably `qemu`, `libvirt-bin`, and kernel modules) can be installed without conflicting with the base image.
 
-4. **Documentation**  
-   - Document the required host capabilities and troubleshooting steps in the repository (e.g., `docs/multipass.md`) so future environment setups can resolve Multipass/Landlock issues quickly.
+3. **Fallback installers**
+   - Identify official `.deb` artifacts from Canonical (see https://multipass.run/download/linux) and confirm whether they can be downloaded with `curl`/`wget` inside the sandbox.
+   - If direct installation fails because the package expects system services that are unavailable, capture the failing maintainer scripts and evaluate whether they can be stubbed or skipped.
 
-Following this plan will surface why Multipass is currently missing, make the installation reliable within the Codex environment, and guarantee that virtual machines boot with Landlock-capable kernels before rerunning `./vm-test.sh`.
+## Phase 3 – Validate virtualization prerequisites
+
+1. **Nested virtualization**
+   - Inspect `/proc/cpuinfo` for `vmx` (Intel) or `svm` (AMD) flags and ensure `lsmod | grep kvm` shows both the core `kvm` module and the architecture-specific module.
+   - Attempt to load modules manually (`sudo modprobe kvm kvm_intel`) and document any permission or kernel configuration errors.
+
+2. **Device availability**
+   - Ensure `/dev/kvm` exists and has the correct ownership/permissions. If the device is missing, note whether the host kernel simply lacks KVM support or if container runtime settings hide the device.
+   - Record whether AppArmor, SELinux, or other MAC systems interfere with QEMU when executed from within the container.
+
+## Phase 4 – Landlock capability assessment
+
+1. **Confirm Multipass driver selection**
+   - After successful installation, run `multipass get local.driver` to confirm the `qemu` driver is active. If the driver reports `lxd` or `none`, determine why Multipass fell back and whether QEMU support can be forced via configuration.
+
+2. **Boot and inspect a micro VM**
+   - Launch a minimal instance (`multipass launch --name landlock-check --cpus 1 --mem 512M --disk 5G --timeout 600 jammy`).
+   - Once the instance is up, enter the guest with `multipass shell landlock-check` and run `grep LANDLOCK /boot/config-$(uname -r)` or, if `/boot/config-*` is unavailable, inspect `/proc/config.gz` to ensure the kernel enables `CONFIG_SECURITY_LANDLOCK=y` or `=m`.
+   - Validate the running kernel version is ≥ 5.13 and supports Landlock by running a simple sample program (for example, build Canonical’s sample from https://github.com/landlock-lsm/landlock-samples) if compilation toolchains are available.
+
+3. **Tear down and clean state**
+   - Remove the test instance (`multipass delete landlock-check && multipass purge`) to ensure subsequent provisioning runs start from a clean slate.
+
+## Phase 5 – Remediation and hardening
+
+1. **Improve automation scripts**
+   - Update `scripts/ensure_multipass.sh` to:
+     - Fail fast if all installer paths are exhausted, surfacing actionable error messages.
+     - Emit a structured log (JSON or tagged shell output) that can be persisted by the Setup/Maintenance hooks.
+     - Provide explicit exit codes distinguishing between “installation skipped by design” and “installation failed.”
+
+2. **Introduce resilient installers**
+   - Add support for installing Multipass from official release archives when Snap/APT are unavailable, including checksum validation.
+   - Consider building a lightweight container image that bundles Multipass binaries and required kernel modules if the sandbox cannot host Snapd.
+
+3. **Embed health checks**
+   - Extend the setup script to run `multipass info --all` and a short `multipass launch --timeout 120 --name sanity-check --cloud-init <(printf 'runcmd:\n - uname -r')` invocation, verifying that VM boot succeeds and Landlock prerequisites are met.
+   - Integrate these checks into CI (for example, extend `./vm-test.sh` with a `--smoke-check` mode) to catch regressions early.
+
+4. **Documentation and escalation paths**
+   - Update repository documentation (`docs/multipass.md` or a new troubleshooting guide) with the exact steps required to enable Multipass in sandboxed environments, including host-level configuration (nested virtualization, cgroup v2, AppArmor allowances).
+   - Record clear escalation paths when prerequisites cannot be satisfied (e.g., escalate to infrastructure to enable `/dev/kvm`, provide instructions for enabling virtualization in the hypervisor hosting the runners).
+
+## Expected outcomes
+
+Executing this plan should reveal why Multipass is currently absent, allow the automation scripts to recover by installing from a viable source, and verify that launched instances provide Landlock-capable kernels. Once these steps succeed, `./vm-test.sh` can be rerun confidently to validate higher-level VM workflows.
