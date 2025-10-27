@@ -63,6 +63,10 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
    - Inspect `apt-cache policy multipass` and `apt-cache show multipass` to confirm package availability and required repository components.
    - Verify that `apt-get update` succeeds and that Multipass dependencies (notably `qemu`, `libvirt-bin`, and kernel modules) can be installed without conflicting with the base image.
    - Capture the output of `apt-get install --dry-run multipass` to enumerate the exact dependency chain and identify pre/post-install scripts that might fail under sandboxed conditions.
+   - **Findings (2025-10-27 04:07:12Z)**
+     - `apt-get update` completed for the Ubuntu archives but emitted a warning because the third-party `https://mise.jdx.dev` repository returned HTTP 403 responses; the failure was ignored and cached indices were reused.
+     - `apt-cache policy multipass`, `apt-cache show multipass`, and `apt-get install --dry-run multipass` all report “Unable to locate package multipass,” indicating that the package is absent from the default Noble repositories.
+     - `apt-cache search multipass` only lists the unrelated `ruby-omniauth-multipassword` package, confirming that no Multipass binary is currently published via APT for this release.
 
 3. **Fallback installers**
    - Identify official `.deb` artifacts from Canonical (see https://multipass.run/download/linux) and confirm whether they can be downloaded with `curl`/`wget` inside the sandbox.
