@@ -72,6 +72,10 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
    - Identify official `.deb` artifacts from Canonical (see https://multipass.run/download/linux) and confirm whether they can be downloaded with `curl`/`wget` inside the sandbox.
    - Validate checksums against the published SHA256 values and store them alongside the downloaded artifacts so subsequent CI runs can reuse the same binary without re-downloading.
    - If direct installation fails because the package expects system services that are unavailable, capture the failing maintainer scripts and evaluate whether they can be stubbed or skipped.
+   - **Findings (2025-10-27 04:31:36Z)**
+     - Requests to `https://multipass.run` follow an HTTP 301 redirect to `https://canonical.com/multipass`, where the proxy at `proxy:8080` responds with `HTTP/1.1 403 Forbidden`; the MITM proxy therefore blocks fetching Canonical-hosted installers directly from the container.
+     - Direct access to Canonical APIs (for example, `https://api.snapcraft.io/api/v1/snaps/details/multipass`) fails with the same proxy-level 403, so downloading Snap metadata or `.deb` assets from Canonical mirrors is currently impossible.
+     - GitHub remains reachable: `https://api.github.com/repos/canonical/multipass/releases/latest` lists only macOS and Windows artifacts for v1.16.1, and downloading `multipass-1.16.1+mac-Darwin.pkg` (SHA256 `758d10dc1b71872b0ee7a17070b93fc788dba5ba45c36b980e42fd895d273489`) succeeds, confirming an alternate trusted source even though no Linux `.deb` is published alongside that release.
 
 ## Phase 4 – Validate virtualization prerequisites
 
