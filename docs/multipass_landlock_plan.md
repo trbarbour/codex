@@ -4,6 +4,13 @@
 
 The immediate symptom is that `./vm-test.sh` exits before running any checks because the `multipass` CLI is missing from `PATH`. The Codex setup pipeline is intended to install Multipass automatically through `scripts/codex-environment-setup.sh`, which in turn delegates to `scripts/ensure_multipass.sh`. Because the automation hooks already execute `codex-environment-setup.sh` during provisioning, the absence of `multipass` implies that `ensure_multipass.sh` exited early or silently failed. The current tasks therefore focus on improving observability, understanding installer constraints inside the sandboxed container, and validating the prerequisites for Landlock once Multipass becomes available.
 
+## Immediate next steps (prioritized)
+
+1. **Re-run baseline discovery checks (Phase 1.1)** to confirm that `multipass` remains absent before instrumenting anything else. This ensures new findings can be attributed to fresh actions rather than stale state.
+2. **Implement persistent logging instrumentation (Phase 2.1)** by updating `scripts/ensure_multipass.sh` (and the setup wrapper, if necessary) to emit structured logs into a predictable directory before any installer probes execute.
+3. **Repeat the traced installer run with instrumentation enabled (Phase 2.2)** using `INSTALL_MULTIPASS_VERBOSE=1 bash -x ...`, verifying that the log captures the exact point of failure and that the script still exits non-zero on hangs/timeouts.
+4. **Collect and archive the generated log artifacts (Phase 2.3)** so subsequent debugging can proceed without rerunning the installer, and summarize the captured evidence in this document.
+
 ## Phase 1 – Establish the current environment
 
 1. **Baseline discovery**
@@ -47,6 +54,10 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
 1. **Evaluate Snap path**
    - Check whether `snapd` is installed and running (`snap version`, `systemctl status snapd`, `journalctl -u snapd`).
    - Document sandbox limitations such as lack of `systemd`, missing cgroup controllers, or read-only filesystems that prevent Snap from working, and capture the exact error messages.
+   - **Findings (2025-10-27 02:40:50Z)**
+     - `snap version` blocks indefinitely waiting on the snapd socket; the command produced no output until it was interrupted manually with `Ctrl+C`.
+     - `systemctl status snapd` fails because the container is not booted with systemd (`System has not been booted with systemd as init system (PID 1). Can't operate.`).
+     - `journalctl -u snapd` reports `No journal files were found. -- No entries --`, confirming that no snapd logs are available in this environment.
 
 2. **Evaluate APT path**
    - Inspect `apt-cache policy multipass` and `apt-cache show multipass` to confirm package availability and required repository components.
