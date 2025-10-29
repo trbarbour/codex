@@ -86,15 +86,25 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
      - `grep -m1 -iE 'vmx|svm' /proc/cpuinfo` produced no output, indicating the container's exposed CPU flags omit the virtualization extensions required by KVM.
      - `/proc/modules` is absent and both `lsmod` and `modprobe` are unavailable, so the running kernel either lacks module support or the utilities are intentionally excluded from the environment.
      - `lscpu | grep Virtualization` reports `Virtualization type: full`, confirming the host advertises a virtualized CPU while still withholding the low-level KVM capabilities needed by Multipass.
+   - **Findings (2025-10-29 18:49:55Z)**
+     - `grep -m1 'flags' /proc/cpuinfo` lists numerous CPU features but no `vmx` or `svm` entries, indicating hardware virtualization extensions are not exposed inside this container.
+     - `lsmod` and `modprobe` are unavailable on the PATH (`command -v lsmod`/`command -v modprobe` return nothing), and attempting `sudo modprobe kvm` fails with `sudo: modprobe: command not found`, so kernel module status cannot be verified from within the current environment.
 
 2. **Device availability**
    - Ensure `/dev/kvm` exists and has the correct ownership/permissions. If the device is missing, note whether the host kernel simply lacks KVM support or if container runtime settings hide the device.
    - Record whether AppArmor, SELinux, or other MAC systems interfere with QEMU when executed from within the container.
+   - **Findings (2025-10-29 19:26:18Z)**
+     - `/dev/kvm` is absent (`ls -l /dev/kvm` reports “No such file or directory”), matching the missing virtualization flags observed earlier.
+     - `aa-status` reports “apparmor not present.”, and SELinux tooling (`sestatus`, `getenforce`) is unavailable, so no mandatory access control layer is actively enforcing policies inside the container.
+     - No loaded kernel modules matching `kvm` are visible under `/sys/module`, reinforcing that hardware virtualization support is not exposed by the runtime.
 
 ## Phase 5 – Landlock capability assessment
 
 1. **Confirm Multipass driver selection**
    - After successful installation, run `multipass get local.driver` to confirm the `qemu` driver is active. If the driver reports `lxd` or `none`, determine why Multipass fell back and whether QEMU support can be forced via configuration.
+   - **Findings (2025-10-29 19:37:40Z)**
+     - `multipass` remains unavailable on `PATH` (`command -v multipass` produced no output), so the driver check cannot proceed until installation succeeds.
+     - Because the CLI is missing, `multipass get local.driver` could not be executed; this task is blocked pending restoration of Multipass.
 
 2. **Boot and inspect a micro VM**
    - Launch a minimal instance (`multipass launch --name landlock-check --cpus 1 --mem 512M --disk 5G --timeout 600 jammy`).

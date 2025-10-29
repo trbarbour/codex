@@ -21,6 +21,10 @@ Run `just fmt` (in `codex-rs` directory) automatically after making Rust code ch
 2. Once those pass, if any changes were made in common, core, or protocol, run the complete test suite with `cargo test --all-features`.
    When running interactively, ask the user before running `just fix` to finalize. `just fmt` does not require approval. project-specific or individual tests can be run without asking the user, but do ask the user before running the complete test suite.
 
+## Shell scripts
+
+- Avoid negated conditionals that immediately `exit $?`; capture the failing status before using negation or append `|| exit $?` so non-zero exit codes propagate.
+
 ## TUI style conventions
 
 See `codex-rs/tui/styles.md`.
