@@ -82,6 +82,10 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
 1. **Nested virtualization**
    - Inspect `/proc/cpuinfo` for `vmx` (Intel) or `svm` (AMD) flags and ensure `lsmod | grep kvm` shows both the core `kvm` module and the architecture-specific module.
    - Attempt to load modules manually (`sudo modprobe kvm kvm_intel`) and document any permission or kernel configuration errors.
+   - **Findings (2025-10-27 13:34:56Z)**
+     - `grep -m1 -iE 'vmx|svm' /proc/cpuinfo` produced no output, indicating the container's exposed CPU flags omit the virtualization extensions required by KVM.
+     - `/proc/modules` is absent and both `lsmod` and `modprobe` are unavailable, so the running kernel either lacks module support or the utilities are intentionally excluded from the environment.
+     - `lscpu | grep Virtualization` reports `Virtualization type: full`, confirming the host advertises a virtualized CPU while still withholding the low-level KVM capabilities needed by Multipass.
 
 2. **Device availability**
    - Ensure `/dev/kvm` exists and has the correct ownership/permissions. If the device is missing, note whether the host kernel simply lacks KVM support or if container runtime settings hide the device.
