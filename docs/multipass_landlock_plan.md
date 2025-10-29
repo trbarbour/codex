@@ -89,6 +89,10 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
 2. **Device availability**
    - Ensure `/dev/kvm` exists and has the correct ownership/permissions. If the device is missing, note whether the host kernel simply lacks KVM support or if container runtime settings hide the device.
    - Record whether AppArmor, SELinux, or other MAC systems interfere with QEMU when executed from within the container.
+   - **Findings (2025-10-29 19:26:18Z)**
+     - `/dev/kvm` is absent (`ls -l /dev/kvm` reports “No such file or directory”), matching the missing virtualization flags observed earlier.
+     - `aa-status` reports “apparmor not present.”, and SELinux tooling (`sestatus`, `getenforce`) is unavailable, so no mandatory access control layer is actively enforcing policies inside the container.
+     - No loaded kernel modules matching `kvm` are visible under `/sys/module`, reinforcing that hardware virtualization support is not exposed by the runtime.
 
 ## Phase 5 – Landlock capability assessment
 
