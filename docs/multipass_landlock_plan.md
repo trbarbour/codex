@@ -98,6 +98,9 @@ The immediate symptom is that `./vm-test.sh` exits before running any checks bec
 
 1. **Confirm Multipass driver selection**
    - After successful installation, run `multipass get local.driver` to confirm the `qemu` driver is active. If the driver reports `lxd` or `none`, determine why Multipass fell back and whether QEMU support can be forced via configuration.
+   - **Findings (2025-10-29 19:37:40Z)**
+     - `multipass` remains unavailable on `PATH` (`command -v multipass` produced no output), so the driver check cannot proceed until installation succeeds.
+     - Because the CLI is missing, `multipass get local.driver` could not be executed; this task is blocked pending restoration of Multipass.
 
 2. **Boot and inspect a micro VM**
    - Launch a minimal instance (`multipass launch --name landlock-check --cpus 1 --mem 512M --disk 5G --timeout 600 jammy`).
