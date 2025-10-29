@@ -42,24 +42,22 @@ run_step() {
   return "${status}"
 }
 
+run_step_or_exit() {
+  if run_step "$@"; then
+    return 0
+  fi
+
+  local status=$?
+  exit "${status}"
+}
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 log_info "codex-environment-setup.sh starting (PID $$)"
 
-if ! run_step "ensure_nix.sh" "${script_dir}/ensure_nix.sh"; then
-  exit $?
-fi
-
-if ! run_step "ensure_multipass.sh" "${script_dir}/ensure_multipass.sh"; then
-  exit $?
-fi
-
-if ! run_step "prefetch_ratatui_git_dependency.sh" "${script_dir}/prefetch_ratatui_git_dependency.sh"; then
-  exit $?
-fi
-
-if ! run_step "install_darcs.sh" "${script_dir}/install_darcs.sh"; then
-  exit $?
-fi
+run_step_or_exit "ensure_nix.sh" "${script_dir}/ensure_nix.sh"
+run_step_or_exit "ensure_multipass.sh" "${script_dir}/ensure_multipass.sh"
+run_step_or_exit "prefetch_ratatui_git_dependency.sh" "${script_dir}/prefetch_ratatui_git_dependency.sh"
+run_step_or_exit "install_darcs.sh" "${script_dir}/install_darcs.sh"
 
 log_info "codex-environment-setup.sh completed successfully"
